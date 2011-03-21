@@ -322,6 +322,21 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
+(defn get-connection
+  "Retrieves an LDAP connection from the pool."
+  [connection-pool]
+  (.getConnection connection-pool))
+
+(defn release-connection
+  "Releases the provided connection back to this pool."
+  [connection-pool connection]
+  (.releaseConnection connection-pool connection))
+
+(defn bind-connection
+  "Change the identity of an existing connection."
+  [connection bind-dn password]
+  (.bind connection (bind-request {:bind-dn bind-dn :password password})))
+
 (defn get
   "If successful, returns a map containing the entry for the given DN.
    Returns nil if the entry doesn't exist or cannot be read. Takes an
