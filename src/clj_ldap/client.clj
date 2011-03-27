@@ -1,4 +1,3 @@
-
 (ns clj-ldap.client
   "LDAP client"
   (:refer-clojure :exclude [get])
@@ -9,6 +8,7 @@
             LDAPConnection
             ResultCode
             LDAPConnectionPool
+            LDAPConnectionPoolStatistics
             LDAPException
             Attribute
             Entry
@@ -22,6 +22,8 @@
             LDAPEntrySource
             EntrySourceException
             SearchScope])
+  (:import [com.unboundid.ldap.sdk.extensions
+            PasswordModifyExtendedRequest])
   (:import [com.unboundid.ldap.sdk.controls
             PreReadRequestControl
             PostReadRequestControl
@@ -295,7 +297,7 @@
 ;;=========== API ==============================================================
 
 (defn connect
-  "Connects to an ldap server and returns a, thread safe, LDAPConnectionPool.
+  "Connects to an ldap server and returns a thread-safe LDAPConnectionPool.
    Options is a map with the following entries:
    :host            Either a string in the form \"address:port\"
                     OR a map containing the keys,
@@ -322,20 +324,29 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
+(defn connection-pool-stats
+  [connection-pool]
+  (let [statistics (.LDAPConnectionPoolStatistics connection-pool)]
+  (.toString statistics)))
+
 (defn get-connection
   "Retrieves an LDAP connection from the pool."
   [connection-pool]
   (.getConnection connection-pool))
 
 (defn release-connection
-  "Releases the provided connection back to this pool."
+  "Releases the provided connection back to the pool."
   [connection-pool connection]
   (.releaseConnection connection-pool connection))
 
 (defn bind-connection
-  "Change the identity of an existing connection."
-  [connection bind-dn password]
-  (.bind connection (bind-request {:bind-dn bind-dn :password password})))
+  "Performs a bind operation using the provided connection and optional
+   credentials. If called with a connection pool, the connection used
+   for the bind request is returned to the pool after the server response.
+   If called with an LDAP connection, and the bind request is successful,
+   it will change the identity of that connection."
+    [connection bind-dn password]
+    (.bind connection (bind-request {:bind-dn bind-dn :password password})))
 
 (defn get
   "If successful, returns a map containing the entry for the given DN.
@@ -381,13 +392,30 @@
       :post-read
         #{:attribute-c :attribute-d}}
 
-Where :add adds an attribute value, :delete deletes an attribute value and :replace replaces the set of values for the attribute with the ones specified. The entries :pre-read and :post-read specify attributes that have be read and returned either before or after the modifications have taken place. 
-"
+Where :add adds an attribute value, :delete deletes an attribute value and
+:replace replaces the set of values for the attribute with the ones specified.
+The entries :pre-read and :post-read specify attributes that have be read and
+returned either before or after the modifications have taken place."
   [connection dn modifications]
   (let [modify-obj (get-modify-request dn modifications)]
     (ldap-result
      (.modify connection modify-obj))))
 
+(defn modify-password
+  "Creates a new password modify extended request that will attempt to change
+   the password of the currently-authenticated user, or another user if their
+   DN is provided."
+  ([connection new]
+    (let [request (PasswordModifyExtendedRequest. new)] 
+      (.processExtendedOperation connection request)))
+
+  ([connection old new]
+    (let [request (PasswordModifyExtendedRequest. old new)]
+      (.processExtendedOperation connection request)))
+
+  ([connection dn old new]
+    (let [request  (PasswordModifyExtendedRequest. dn old new)]
+      (.processExtendedOperation connection request))))
 
 (defn delete
   "Deletes the given entry in the connected ldap server. Optionally takes
