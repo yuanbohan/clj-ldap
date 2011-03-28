@@ -8,7 +8,6 @@
             LDAPConnection
             ResultCode
             LDAPConnectionPool
-            LDAPConnectionPoolStatistics
             LDAPException
             Attribute
             Entry
@@ -324,11 +323,6 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
-(defn connection-pool-stats
-  [connection-pool]
-  (let [statistics (.LDAPConnectionPoolStatistics connection-pool)]
-  (.toString statistics)))
-
 (defn get-connection
   "Retrieves an LDAP connection from the pool."
   [connection-pool]
@@ -346,7 +340,7 @@
    If called with an LDAP connection, and the bind request is successful,
    it will change the identity of that connection."
     [connection bind-dn password]
-    (.bind connection (bind-request {:bind-dn bind-dn :password password})))
+    (.bind connection bind-dn password))
 
 (defn get
   "If successful, returns a map containing the entry for the given DN.
@@ -404,7 +398,7 @@ returned either before or after the modifications have taken place."
 (defn modify-password
   "Creates a new password modify extended request that will attempt to change
    the password of the currently-authenticated user, or another user if their
-   DN is provided."
+   DN is provided and the caller has the required authorisation."
   ([connection new]
     (let [request (PasswordModifyExtendedRequest. new)] 
       (.processExtendedOperation connection request)))
