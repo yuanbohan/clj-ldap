@@ -340,7 +340,8 @@
    If called with an LDAP connection, and the bind request is successful,
    it will change the identity of that connection."
     [connection bind-dn password]
-    (.bind connection bind-dn password))
+    (def bind-result (.bind connection bind-dn password))
+    (if (= ResultCode/SUCCESS (.getResultCode bind-result)) true false))
 
 (defn get
   "If successful, returns a map containing the entry for the given DN.
