@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.clojars.pntblnk</groupId>
   <artifactId>clj-ldap</artifactId>
-  <version>0.0.5-SNAPSHOT</version>
+  <version>0.0.5</version>
   <name>clj-ldap</name>
   <description>Clojure ldap client (development fork of alienscience's clj-ldap).</description>
   <url>https://github.com/pauldorman/clj-ldap</url>
@@ -13,7 +13,7 @@
   <scm>
     <connection>scm:git:git://github.com/pauldorman/clj-ldap.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/pauldorman/clj-ldap.git</developerConnection>
-    <tag>4075b30450688efce1db9a96b09732e64a012e01</tag>
+    <tag>7a462b3cbfeb6944df6704e3413f6cc74e3fbd96</tag>
     <url>https://github.com/pauldorman/clj-ldap</url>
   </scm>
   <build>
