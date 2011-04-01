@@ -48,7 +48,7 @@ Options is a map with the following entries:
     :timeout         The timeout when waiting for a response from the server
                      (milliseconds), defaults to 5 minutes
 
-Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
+Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
 
 An example:
     (ldap/connect conn {:host "ldap.example.com" :num-connections 10})
@@ -61,7 +61,24 @@ An example:
                         
     (ldap/connect conn {:host {:port 8000}})
                                
-    
+
+## bind? [connection bind-dn password] [connection-pool bind-dn password]
+
+Usage: 
+    (ldap/bind? conn "cn=dude,ou=people,dc=example,dc=com" "somepass")
+
+Performs a bind operation using the provided connection, bindDN and
+password. Returns true if successful.
+
+When an LDAP connection object is used as the connection argument the
+bind? function will attempt to change the identity of that connection
+to that of the provided DN. Subsequent operations on that connection
+will be done using the bound identity.
+
+If an LDAP connection pool object is passed as the connection argument
+the bind attempt will have no side-effects, leaving the state of the
+underlying connections unchanged.
+
 ## get [connection dn] [connection dn attributes]
   
 If successful, returns a map containing the entry for the given DN.
