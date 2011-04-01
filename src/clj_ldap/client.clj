@@ -22,7 +22,8 @@
             EntrySourceException
             SearchScope])
   (:import [com.unboundid.ldap.sdk.extensions
-            PasswordModifyExtendedRequest])
+            PasswordModifyExtendedRequest
+            PasswordModifyExtendedResult])
   (:import [com.unboundid.ldap.sdk.controls
             PreReadRequestControl
             PostReadRequestControl
@@ -323,26 +324,23 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
-(defn get-connection
-  "Retrieves an LDAP connection from the pool."
-  [connection-pool]
-  (.getConnection connection-pool))
+(defn bind?
+  "Performs a bind operation using the provided connection, bindDN and
+password. Returns true if successful.
 
-(defn release-connection
-  "Releases the provided connection back to the pool."
-  [connection-pool connection]
-  (.releaseConnection connection-pool connection))
+When an LDAP connection object is used as the connection argument the
+bind? function will attempt to change the identity of that connection
+to that of the provided DN. Subsequent operations on that connection
+will be done using the bound identity.
 
-(defn bind-connection
-  "Performs a bind operation using the provided connection and optional
-   credentials. If called with a connection pool, the connection used
-   for the bind request is returned to the pool after the server response.
-   If called with an LDAP connection, and the bind request is successful,
-   it will change the identity of that connection."
-    [connection bind-dn password]
-    (try 
-      ((.bind connection bind-dn password) true)
-      (catch Exception _ false)))
+If an LDAP connection pool object is passed as the connection argument
+the bind attempt will have no side-effects, leaving the state of the
+underlying connections unchanged."
+  [connection bind-dn password]
+  (try 
+    (let [bind-result (.bind connection bind-dn password)]
+      (if (= ResultCode/SUCCESS (.getResultCode bind-result)) true false))
+    (catch Exception _ false)))
 
 (defn get
   "If successful, returns a map containing the entry for the given DN.
@@ -409,8 +407,8 @@ returned either before or after the modifications have taken place."
     (let [request (PasswordModifyExtendedRequest. old new)]
       (.processExtendedOperation connection request)))
 
-  ([connection dn old new]
-    (let [request  (PasswordModifyExtendedRequest. dn old new)]
+  ([connection old new dn]
+    (let [request (PasswordModifyExtendedRequest. dn old new)]
       (.processExtendedOperation connection request))))
 
 (defn delete
