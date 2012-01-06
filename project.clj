@@ -9,6 +9,7 @@
                      [org.slf4j/slf4j-simple "1.5.6"]
                      [clj-file-utils "0.2.1"]
                      [lein-clojars "0.6.0"]]
+  :aot [clj-ldap.client]
   :license {:name "Eclipse Public License - v 1.0"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo
