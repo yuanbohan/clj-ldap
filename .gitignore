@@ -1,0 +1,7 @@
+classes
+.lein*
+lib
+target
+#*#
+.#*
+.DS_Store
