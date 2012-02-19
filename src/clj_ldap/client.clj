@@ -36,6 +36,11 @@
 
 ;;======== Helper functions ====================================================
 
+(defn encode [attr]
+  (if (.needsBase64Encoding attr)
+    (.encode (sun.misc.BASE64Encoder.) (.getValueByteArray attr))
+    (.getValue attr)))
+
 (defn- extract-attribute
   "Extracts [:name value] from the given attribute object. Converts
    the objectClass attribute to a set."
@@ -44,7 +49,7 @@
     (cond
       (= :objectClass k)     [k (set (vec (.getValues attr)))]
       (> (.size attr) 1)     [k (vec (.getValues attr))]
-      :else                  [k (.getValue attr)])))
+      :else                  [k (encode attr)])))
 
 (defn- entry-as-map
   "Converts an Entry object into a map optionally adding the DN"
