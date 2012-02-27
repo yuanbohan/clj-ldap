@@ -29,6 +29,8 @@
             PostReadRequestControl
             PreReadResponseControl
             PostReadResponseControl])
+  (:import [com.unboundid.util
+            Base64])
   (:import [com.unboundid.util.ssl
             SSLUtil
             TrustAllTrustManager
@@ -38,7 +40,7 @@
 
 (defn encode [attr]
   (if (.needsBase64Encoding attr)
-    (.encode (sun.misc.BASE64Encoder.) (.getValueByteArray attr))
+    (Base64/encode (.getValueByteArray attr))
     (.getValue attr)))
 
 (defn- extract-attribute
