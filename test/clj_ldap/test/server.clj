@@ -2,7 +2,6 @@
 (ns clj-ldap.test.server
   "An embedded ldap server for unit testing"
   (:require [clj-ldap.client :as ldap])
-  (:use clojure.contrib.def)
   (:use [clj-file-utils.core :only [rm-rf mkdir-p]])
   (:import [org.apache.directory.server.core
             DefaultDirectoryService
