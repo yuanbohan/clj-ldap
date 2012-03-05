@@ -1,8 +1,7 @@
-
 (ns clj-ldap.test.server
   "An embedded ldap server for unit testing"
-  (:require [clj-ldap.client :as ldap])
-  (:use [clj-file-utils.core :only [rm-rf mkdir-p]])
+  (:require [clj-ldap.client :as ldap]
+            [fs.core :as fs])
   (:import [org.apache.directory.server.core
             DefaultDirectoryService
             DirectoryService])
@@ -37,8 +36,7 @@
 (defn- start-ldap-server
   "Start up an embedded ldap server"
   [port ssl-port]
-  (let [work-path (doto "/tmp/apacheds" rm-rf mkdir-p)
-        work-dir  (java.io.File. work-path)
+  (let [work-dir (fs/temp-dir)
         directory-service (doto (DefaultDirectoryService.)
                             (.setShutdownHookEnabled true)
                             (.setWorkingDirectory work-dir))
@@ -72,9 +70,6 @@
              :cn "Saul Hazledine"
              :sn "Hazledine"
              :description "Creator of bugs"}))
-
-
-
 
 (defn stop!
   "Stops the embedded ldap server"

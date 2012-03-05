@@ -1,4 +1,3 @@
-
 (ns clj-ldap.test.client
   "Automated tests for clj-ldap"
   (:require [clj-ldap.client :as ldap])
@@ -8,10 +7,10 @@
 
 
 ;; Tests are run over a variety of connection types
-(def port* 8000)
-(def ssl-port* 8001)
-(def *connections* nil)
-(def *conn* nil)
+(def port* 1389)
+(def ssl-port* 1636)
+(def ^:dynamic *connections* nil)
+(def ^:dynamic *conn* nil)
 
 ;; Tests concentrate on a single object class
 (def base* "ou=people,dc=alienscience,dc=org,dc=uk")
@@ -19,7 +18,7 @@
 (def object-class* #{"top" "person"})
 
 ;; Variable to catch side effects
-(def *side-effects* nil)
+(def ^:dynamic *side-effects* nil)
 
 ;; Result of a successful write
 (def success*      {:code 0 :name "success"})
