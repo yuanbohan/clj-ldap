@@ -5,7 +5,7 @@ clj-ldap is a thin layer on the [unboundid sdk](http://www.unboundid.com/product
 
      :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.7"]]
 
-# Example
+# Example 
 
     (ns example
       (:require [clj-ldap.client :as ldap]))
