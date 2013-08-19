@@ -3,3 +3,7 @@
 classes
 lib
 target
+.lein*
+#*#
+.#*
+.DS_Store
