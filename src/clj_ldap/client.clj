@@ -272,9 +272,7 @@
         (if (and
               (not-nil? control)
               (> (.getValueLength (.getCookie control)) 0))
-          (recur 
-            newres
-            (.getCookie control))
+          (recur newres (.getCookie control))
           (seq newres)))))) 
 
 (defn- search-results
