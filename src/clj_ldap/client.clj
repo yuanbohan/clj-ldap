@@ -268,7 +268,10 @@
       (.setControls req (list (SimplePagedResultsControl. sizeLimit cookie)))
       (let [res (.search connection req)
             control (SimplePagedResultsControl/get res)
-            newres (into results (remove empty? (map entry-as-map (.getSearchEntries res))))]
+            newres (->> (.getSearchEntries res) 
+                     (map entry-as-map) 
+                     (remove empty?) 
+                     (into results))]
         (if (and
               (not-nil? control)
               (> (.getValueLength (.getCookie control)) 0))
