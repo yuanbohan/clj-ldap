@@ -1,7 +1,9 @@
+.classpath
+.project
 classes
-.lein*
 lib
 target
+.lein*
 #*#
 .#*
 .DS_Store

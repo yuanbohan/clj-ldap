@@ -20,7 +20,8 @@
             SearchRequest
             LDAPEntrySource
             EntrySourceException
-            SearchScope])
+            SearchScope
+            DereferencePolicy])
   (:import [com.unboundid.ldap.sdk.extensions
             PasswordModifyExtendedRequest
             PasswordModifyExtendedResult])
@@ -28,13 +29,23 @@
             PreReadRequestControl
             PostReadRequestControl
             PreReadResponseControl
-            PostReadResponseControl])
+            PostReadResponseControl
+            SimplePagedResultsControl])
+  (:import [com.unboundid.util
+            Base64])
   (:import [com.unboundid.util.ssl
             SSLUtil
             TrustAllTrustManager
             TrustStoreTrustManager]))
 
 ;;======== Helper functions ====================================================
+
+(def not-nil? (complement nil?))
+
+(defn encode [attr]
+  (if (.needsBase64Encoding attr)
+    (Base64/encode (.getValueByteArray attr))
+    (.getValue attr)))
 
 (defn- extract-attribute
   "Extracts [:name value] from the given attribute object. Converts
@@ -44,7 +55,7 @@
     (cond
       (= :objectClass k)     [k (set (vec (.getValues attr)))]
       (> (.size attr) 1)     [k (vec (.getValues attr))]
-      :else                  [k (.getValue attr)])))
+      :else                  [k (encode attr)])))
 
 (defn- entry-as-map
   "Converts an Entry object into a map optionally adding the DN"
@@ -240,6 +251,33 @@
   (if-let [n (.nextEntry source)]
     (cons n (lazy-seq (entry-seq source)))))
 
+;; Extended version of search-results function using a 
+;; SearchRequest that uses a SimplePagedResultsControl.  
+;; Allows us to read arbitrarily large result sets.
+;; TODO make this lazy
+(defn- search-all-results
+  "Returns a sequence of search results via paging so we don't run into
+   size limits with the number of results."
+  [connection {:keys [base scope filter attributes]}]
+  (let [sizeLimit 500
+        timeLimit 60
+        cookie nil
+        req (SearchRequest. base scope filter attributes)]
+    (loop [results []
+           cookie nil]
+      (.setControls req (list (SimplePagedResultsControl. sizeLimit cookie)))
+      (let [res (.search connection req)
+            control (SimplePagedResultsControl/get res)
+            newres (->> (.getSearchEntries res) 
+                     (map entry-as-map) 
+                     (remove empty?) 
+                     (into results))]
+        (if (and
+              (not-nil? control)
+              (> (.getValueLength (.getCookie control)) 0))
+          (recur newres (.getCookie control))
+          (seq newres)))))) 
+
 (defn- search-results
   "Returns a sequence of search results for the given search criteria."
   [connection {:keys [base scope filter attributes]}]
@@ -424,6 +462,21 @@ returned either before or after the modifications have taken place."
        (ldap-result
         (.delete connection delete-obj)))))
 
+(defn search-all
+  "Runs a search on the connected ldap server, reads all the results into
+   memory and returns the results as a sequence of maps.
+
+   Options is a map with the following optional entries:
+      :scope       The search scope, can be :base :one or :sub,
+                   defaults to :sub
+      :filter      A string describing the search filter,
+                   defaults to \"(objectclass=*)\"
+      :attributes  A collection of the attributes to return,
+                   defaults to all user attributes"
+  ([connection base]
+     (search-all connection base nil))
+  ([connection base options]
+     (search-all-results connection (search-criteria base options))))
 
 (defn search
   "Runs a search on the connected ldap server, reads all the results into
