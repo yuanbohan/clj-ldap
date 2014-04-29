@@ -13,6 +13,7 @@
             Entry
             ModificationType
             ModifyRequest
+            ModifyDNRequest
             Modification
             DeleteRequest
             SimpleBindRequest
@@ -448,6 +449,18 @@ returned either before or after the modifications have taken place."
   ([connection old new dn]
     (let [request (PasswordModifyExtendedRequest. dn old new)]
       (.processExtendedOperation connection request))))
+
+(defn modify-rdn
+  "Modifies the RDN (Relative Distinguished Name) of an entry in the connected
+  ldap server.
+  
+  The new-rdn has the form cn=foo or ou=foo. Using just foo is not sufficient.
+  The delete-old-rdn boolean option indicates whether to delete the current 
+  RDN value from the target entry."
+  [connection dn new-rdn delete-old-rdn]
+  (let [request (ModifyDNRequest. dn new-rdn delete-old-rdn)]
+    (ldap-result
+      (.modifyDN connection request))))
 
 (defn delete
   "Deletes the given entry in the connected ldap server. Optionally takes
