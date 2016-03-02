@@ -1,8 +1,8 @@
 (defproject org.clojars.pntblnk/clj-ldap "0.0.9"
   :description "Clojure ldap client (development fork of alienscience's clj-ldap)."
   :url "https://github.com/pauldorman/clj-ldap"
-  :dependencies [[org.clojure/clojure "1.3.0"]
-                 [com.unboundid/unboundid-ldapsdk "2.3.0"]]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [com.unboundid/unboundid-ldapsdk "3.1.0"]]
   :dev-dependencies [[jline "0.9.94"]
                      [org.apache.directory.server/apacheds-all "1.5.5"]
                      [fs "1.1.2"]
