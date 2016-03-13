@@ -22,7 +22,9 @@
             LDAPEntrySource
             EntrySourceException
             SearchScope
-            DereferencePolicy])
+            DereferencePolicy
+            LDAPSearchException
+            Control])
   (:import [com.unboundid.ldap.sdk.extensions
             PasswordModifyExtendedRequest
             PasswordModifyExtendedResult])
@@ -63,8 +65,7 @@
   ([entry]
      (entry-as-map entry true))
   ([entry dn?]
-     (let [col-a (.getAttributes entry)
-           attrs (seq (.getAttributes entry))]
+     (let [attrs (seq (.getAttributes entry))]
        (if dn?
          (apply hash-map :dn (.getDN entry)
                 (mapcat extract-attribute attrs))
@@ -75,7 +76,7 @@
   "Adds the values contained in given response control to the given map"
   [m control]
   (condp instance? control
-    PreReadResponseControl 
+    PreReadResponseControl
     (update-in m [:pre-read] merge (entry-as-map (.getEntry control) false))
     PostReadResponseControl
     (update-in m [:post-read] merge (entry-as-map (.getEntry control) false))
@@ -222,7 +223,6 @@
           pre-read-control (PostReadRequestControl. (into-array attributes))]
       (.addControl request pre-read-control))))
 
-
 (defn- get-modify-request
   "Sets up a ModifyRequest object using the contents of the given map"
   [dn modifications]
@@ -252,57 +252,78 @@
   (if-let [n (.nextEntry source)]
     (cons n (lazy-seq (entry-seq source)))))
 
-;; Extended version of search-results function using a 
-;; SearchRequest that uses a SimplePagedResultsControl.  
+;; Extended version of search-results function using a
+;; SearchRequest that uses a SimplePagedResultsControl.
 ;; Allows us to read arbitrarily large result sets.
 ;; TODO make this lazy
 (defn- search-all-results
   "Returns a sequence of search results via paging so we don't run into
    size limits with the number of results."
-  [connection {:keys [base scope filter attributes]}]
-  (let [sizeLimit 500
-        timeLimit 60
+  [connection {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
+                      controls]}]
+  (let [pageSize 500
         cookie nil
-        req (SearchRequest. base scope filter attributes)]
+        req (SearchRequest. base scope DereferencePolicy/NEVER
+                            sizeLimit timeLimit typesOnly filter attributes)
+        - (and (not (empty? controls))
+               (.addControls req (into-array Control controls)))]
     (loop [results []
            cookie nil]
-      (.setControls req (list (SimplePagedResultsControl. sizeLimit cookie)))
+      (.setControls req (list (SimplePagedResultsControl. pageSize cookie)))
       (let [res (.search connection req)
             control (SimplePagedResultsControl/get res)
-            newres (->> (.getSearchEntries res) 
-                     (map entry-as-map) 
-                     (remove empty?) 
+            newres (->> (.getSearchEntries res)
+                     (map entry-as-map)
+                     (remove empty?)
                      (into results))]
         (if (and
               (not-nil? control)
               (> (.getValueLength (.getCookie control)) 0))
           (recur newres (.getCookie control))
-          (seq newres)))))) 
+          (seq newres))))))
 
 (defn- search-results
-  "Returns a sequence of search results for the given search criteria."
-  [connection {:keys [base scope filter attributes]}]
-  (let [res (.search connection base scope filter attributes)]
-    (if (> (.getEntryCount res) 0)
-      (remove empty?
-              (map entry-as-map (.getSearchEntries res))))))
+  "Returns a sequence of search results for the given search criteria.
+   Ignore a size limit exceeded exception if one occurs. If the caller
+   provided a respf! then apply the function to any response controls."
+  [conn {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
+                controls respf!]}]
+  (try
+    (let [req (SearchRequest. base scope DereferencePolicy/NEVER sizeLimit
+                              timeLimit typesOnly filter attributes)
+          - (and (not (empty? controls))
+                 (.addControls req (into-array Control controls)))
+          res (.search conn req)]
+      (when (not-nil? respf!) (respf! (.getResponseControls res)))
+      (if (> (.getEntryCount res) 0)
+       (map entry-as-map (.getSearchEntries res))))
+    (catch LDAPSearchException e
+      (when (not-nil? respf!) (respf! (.getResponseControls e)))
+      (if (= ResultCode/SIZE_LIMIT_EXCEEDED (.getResultCode e))
+        (map entry-as-map (.getSearchEntries e))
+        (throw e)))))
 
 (defn- search-results!
   "Call the given function with the results of the search using
    the given search criteria"
-  [pool {:keys [base scope filter attributes]} queue-size f]
-  (let [request (SearchRequest. base scope filter attributes)
+  [pool {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
+                controls respf!]} f]
+  (let [req (SearchRequest. base scope DereferencePolicy/NEVER
+                            sizeLimit timeLimit typesOnly filter attributes)
+        - (and (not (empty? controls))
+               (.addControls req (into-array Control controls)))
         conn (.getConnection pool)]
     (try
-      (with-open [source (LDAPEntrySource. conn request false)]
-        (doseq [i (remove empty?
-                          (map entry-as-map (entry-seq source)))]
-          (f i)))
+      (with-open [source (LDAPEntrySource. conn req false)]
+        (let [res (.getSearchResult source)]
+          (when (not-nil? respf!) (respf! (.getResponseControls res)))
+          (doseq [i (remove empty?
+                           (map entry-as-map (entry-seq source)))]
+           (f i))))
       (.releaseConnection pool conn)
       (catch EntrySourceException e
         (.releaseDefunctConnection pool conn)
         (throw e)))))
-
 
 (defn- get-scope
   "Converts a keyword into a SearchScope object"
@@ -310,6 +331,7 @@
   (condp = k
     :base SearchScope/BASE
     :one  SearchScope/ONE
+    :subordinate SearchScope/SUBORDINATE_SUBTREE
     SearchScope/SUB))
 
 (defn- get-attributes
@@ -323,15 +345,19 @@
                                        (map name attrs))))
 
 (defn- search-criteria
-  "Returns a map of search criteria from the given base and options"
-  [base options]
-  (let [scope (get-scope (:scope options))
-        filter (or (:filter options) "(objectclass=*)")
-        attributes (get-attributes (:attributes options))]
-    {:base base
-     :scope scope
-     :filter filter
-     :attributes attributes}))
+  "Given a map of search criteria and possibly other keys, return the same map
+   with search criteria keys rewritten ready for passing to search functions."
+  [base {:keys [scope filter attributes sizeLimit timeLimit typesOnly controls
+                respf!]
+         :as original
+         :or {sizeLimit 0 timeLimit 0 typesOnly false filter "(objectclass=*)"
+              controls [] respf! nil}}]
+  (merge original {:base       base
+                   :scope      (get-scope scope)
+                   :filter     filter
+                   :attributes (get-attributes attributes)
+                   :sizeLimit  sizeLimit :timeLimit timeLimit :typesOnly typesOnly
+                   :controls   controls}))
 
 ;;=========== API ==============================================================
 
@@ -352,7 +378,7 @@
                     JKS format file, optional, defaults to trusting all
                     certificates
    :connect-timeout The timeout for making connections (milliseconds),
-                    defaults to 1 minute   
+                    defaults to 1 minute
    :timeout         The timeout when waiting for a response from the server
                     (milliseconds), defaults to 5 minutes
    "
@@ -362,6 +388,11 @@
              (not (map? host)))
       (connect-to-hosts options)
       (connect-to-host options))))
+
+(defn close
+  "Close the connection"
+  [connection]
+  (.close connection))
 
 (defn bind?
   "Performs a bind operation using the provided connection, bindDN and
@@ -376,7 +407,7 @@ If an LDAP connection pool object is passed as the connection argument
 the bind attempt will have no side-effects, leaving the state of the
 underlying connections unchanged."
   [connection bind-dn password]
-  (try 
+  (try
     (let [bind-result (.bind connection bind-dn password)]
       (if (= ResultCode/SUCCESS (.getResultCode bind-result)) true false))
     (catch Exception _ false)))
@@ -387,14 +418,14 @@ underlying connections unchanged."
    optional collection that specifies which attributes will be returned
    from the server."
   ([connection dn]
-     (get connection dn nil))
+   (get connection dn nil))
   ([connection dn attributes]
-     (if-let [result (if attributes
-                       (.getEntry connection dn
-                                  (into-array java.lang.String
-                                              (map name attributes)))
-                       (.getEntry connection dn))]
-        (entry-as-map result))))
+   (if-let [result (if attributes
+                     (.getEntry connection dn
+                                (into-array java.lang.String
+                                            (map name attributes)))
+                     (.getEntry connection dn))]
+      (entry-as-map result))))
 
 (defn add
   "Adds an entry to the connected ldap server. The entry is assumed to be
@@ -439,23 +470,23 @@ returned either before or after the modifications have taken place."
    the password of the currently-authenticated user, or another user if their
    DN is provided and the caller has the required authorisation."
   ([connection new]
-    (let [request (PasswordModifyExtendedRequest. new)] 
-      (.processExtendedOperation connection request)))
+   (let [request (PasswordModifyExtendedRequest. new)]
+     (.processExtendedOperation connection request)))
 
   ([connection old new]
-    (let [request (PasswordModifyExtendedRequest. old new)]
-      (.processExtendedOperation connection request)))
+   (let [request (PasswordModifyExtendedRequest. old new)]
+     (.processExtendedOperation connection request)))
 
   ([connection old new dn]
-    (let [request (PasswordModifyExtendedRequest. dn old new)]
-      (.processExtendedOperation connection request))))
+   (let [request (PasswordModifyExtendedRequest. dn old new)]
+     (.processExtendedOperation connection request))))
 
 (defn modify-rdn
   "Modifies the RDN (Relative Distinguished Name) of an entry in the connected
   ldap server.
-  
+
   The new-rdn has the form cn=foo or ou=foo. Using just foo is not sufficient.
-  The delete-old-rdn boolean option indicates whether to delete the current 
+  The delete-old-rdn boolean option indicates whether to delete the current
   RDN value from the target entry."
   [connection dn new-rdn delete-old-rdn]
   (let [request (ModifyDNRequest. dn new-rdn delete-old-rdn)]
@@ -475,58 +506,42 @@ returned either before or after the modifications have taken place."
        (ldap-result
         (.delete connection delete-obj)))))
 
-(defn search-all
-  "Runs a search on the connected ldap server, reads all the results into
-   memory and returns the results as a sequence of maps.
+;; For the following search functions.
+;; Options is a map with the following optional entries:
+;;    :scope       The search scope, can be :base :one :sub or "subordinate,
+;;                 defaults to :sub
+;;    :filter      A string representing the search filter,
+;;                 defaults to \"(objectclass=*)\"
+;;    :attributes  A collection of the attributes to return,
+;;                 defaults to all user attributes
+;;    :sizeLimit   The maximum number of entries that the server should return
+;;    :timeLimit   The maximum length of time in seconds that the server should
+;;                 spend processing this request
+;;    :typesOnly   Return only attribute names instead of names and values
+;;    :controls    Adds the provided controls for this request.
+;;    :respf!     Applys this function to all response controls present.
 
-   Options is a map with the following optional entries:
-      :scope       The search scope, can be :base :one or :sub,
-                   defaults to :sub
-      :filter      A string describing the search filter,
-                   defaults to \"(objectclass=*)\"
-      :attributes  A collection of the attributes to return,
-                   defaults to all user attributes"
+(defn search-all
+  "Uses SimplePagedResultsControl to search on the connected ldap server, reads
+  all the results into memory and returns the results as a sequence of maps."
   ([connection base]
-     (search-all connection base nil))
+   (search-all connection base nil))
   ([connection base options]
-     (search-all-results connection (search-criteria base options))))
+   (search-all-results connection (search-criteria base options))))
 
 (defn search
   "Runs a search on the connected ldap server, reads all the results into
-   memory and returns the results as a sequence of maps.
-
-   Options is a map with the following optional entries:
-      :scope       The search scope, can be :base :one or :sub,
-                   defaults to :sub
-      :filter      A string describing the search filter,
-                   defaults to \"(objectclass=*)\"
-      :attributes  A collection of the attributes to return,
-                   defaults to all user attributes"
+   memory and returns the results as a sequence of maps."
   ([connection base]
-     (search connection base nil))
+   (search connection base nil))
   ([connection base options]
-     (search-results connection (search-criteria base options))))
+   (search-results connection (search-criteria base options))))
 
 (defn search!
   "Runs a search on the connected ldap server and executes the given
    function (for side effects) on each result. Does not read all the
-   results into memory.
-
-   Options is a map with the following optional entries:
-      :scope       The search scope, can be :base :one or :sub,
-                   defaults to :sub
-      :filter      A string describing the search filter,
-                   defaults to \"(objectclass=*)\"
-      :attributes  A collection of the attributes to return,
-                   defaults to all user attributes
-      :queue-size  The size of the internal queue used to store results before
-                   they are passed to the function, the default is 100"
+   results into memory."
   ([connection base f]
-     (search! connection base nil f))
+   (search! connection base nil f))
   ([connection base options f]
-     (let [queue-size (or (:queue-size options) 100)]
-       (search-results! connection
-                        (search-criteria base options)
-                        queue-size
-                        f))))
-
+   (search-results! connection (search-criteria base options) f)))

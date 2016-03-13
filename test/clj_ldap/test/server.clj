@@ -1,62 +1,57 @@
 (ns clj-ldap.test.server
   "An embedded ldap server for unit testing"
-  (:require [clj-ldap.client :as ldap]
-            [fs.core :as fs])
-  (:import [org.apache.directory.server.core
-            DefaultDirectoryService
-            DirectoryService])
-  (:import [org.apache.directory.server.ldap
-            LdapServer])
-  (:import [org.apache.directory.server.protocol.shared.transport
-            TcpTransport])
-  (:import [java.util HashSet])
-  (:import [org.apache.directory.server.core.partition.impl.btree.jdbm
-            JdbmPartition
-            JdbmIndex]))
+  (:require [clj-ldap.client :as ldap])
+  (:import [com.unboundid.ldap.listener
+            InMemoryDirectoryServerConfig
+            InMemoryDirectoryServer
+            InMemoryListenerConfig])
+  (:import [com.unboundid.ldap.sdk.schema
+            Schema])
+  (:import [com.unboundid.util.ssl
+            KeyStoreKeyManager
+            SSLUtil
+            TrustAllTrustManager])
+  (:import (java.io File)
+           (java.util.logging FileHandler Level)
+           (com.unboundid.util MinimalLogFormatter)))
 
+;; server will hold an InMemoryDirectoryServer instance
 (defonce server (atom nil))
 
-(defn- add-partition! 
-  "Adds a partition to the embedded directory service"
-  [service id dn]
-  (let [partition (doto (JdbmPartition.)
-                    (.setId id)
-                    (.setSuffix dn))]
-    (.addPartition service partition)
-    partition))
-
-(defn- add-index!
-  "Adds an index to the given partition on the given attributes"
-  [partition & attrs]
-  (let [indexed-attrs (HashSet.)]
-    (doseq [attr attrs]
-      (.add indexed-attrs (JdbmIndex. attr)))
-    (.setIndexedAttributes partition indexed-attrs)))
+(defn- createAccessLogger
+  "Let the server write protocol information to test-resources/access"
+  []
+  (let [logFile (File. "test-resources/access")
+        fileHandler (FileHandler. (.getAbsolutePath logFile) true)]
+    (.setLevel fileHandler Level/INFO)
+    (.setFormatter fileHandler (MinimalLogFormatter. nil false false true))
+    fileHandler))
 
 (defn- start-ldap-server
-  "Start up an embedded ldap server"
-  [port ssl-port]
-  (let [work-dir (fs/temp-dir)
-        directory-service (doto (DefaultDirectoryService.)
-                            (.setShutdownHookEnabled true)
-                            (.setWorkingDirectory work-dir))
-        ldap-transport (TcpTransport. port)
-        ssl-transport (doto (TcpTransport. ssl-port)
-                        (.setEnableSSL true))
-        ldap-server (doto (LdapServer.)
-                      (.setDirectoryService directory-service)
-                      (.setAllowAnonymousAccess true)
-                      (.setTransports
-                       (into-array [ldap-transport ssl-transport])))]
-    (-> (add-partition! directory-service
-                        "clojure" "dc=alienscience,dc=org,dc=uk")
-        (add-index! "objectClass" "ou" "uid"))
-    (.startup directory-service)
-    (.start ldap-server)
-    [directory-service ldap-server]))
+  "Setup a server listening on available LDAP and LDAPS ports chosen at random"
+  []
+  (let [cfg (InMemoryDirectoryServerConfig. (into-array String ["dc=alienscience,dc=org,dc=uk"]))
+        _ (.addAdditionalBindCredentials cfg "cn=Directory Manager" "password")
+        _ (.setSchema cfg (Schema/getDefaultStandardSchema))
+        _ (.setAccessLogHandler cfg (createAccessLogger))
+        keystore (KeyStoreKeyManager. "test-resources/server.keystore"
+                                      (char-array "password") "JKS" "server-cert")
+        serverSSLUtil (SSLUtil. keystore (TrustAllTrustManager.))
+        clientSSLUtil (SSLUtil. (TrustAllTrustManager.))
+        _ (.setListenerConfigs cfg
+                               [(InMemoryListenerConfig/createLDAPConfig
+                                  "LDAP" nil 0
+                                  (.createSSLSocketFactory serverSSLUtil))
+                                (InMemoryListenerConfig/createLDAPSConfig
+                                  "LDAPS" nil 0
+                                  (.createSSLServerSocketFactory serverSSLUtil)
+                                  (.createSSLSocketFactory clientSSLUtil))])
+        ds (InMemoryDirectoryServer. cfg)]
+    (.startListening ds)
+    ds))
 
 (defn- add-toplevel-objects!
-  "Adds top level objects, needed for testing, to the ldap server"
+  "Adds top level entries, needed for testing, to the ldap server"
   [connection]
   (ldap/add connection "dc=alienscience,dc=org,dc=uk"
             {:objectClass ["top" "domain" "extensibleObject"]
@@ -72,18 +67,25 @@
              :description "Creator of bugs"}))
 
 (defn stop!
-  "Stops the embedded ldap server"
+  "Stops the embedded ldap server (listening on LDAP and LDAPS ports)"
   []
   (if @server
-    (let [[directory-service ldap-server] @server]
-      (reset! server nil)
-      (.stop ldap-server)
-      (.shutdown directory-service))))
+    (do
+      (.shutDown @server true)
+      (reset! server nil))))
+
+(defn ldapPort
+  []
+  (.getListenPort @server "LDAP"))
+
+(defn ldapsPort
+  []
+  (.getListenPort @server "LDAPS"))
 
 (defn start!
-  "Starts an embedded ldap server on the given port"
-  [port ssl-port]
+  "Starts an embedded ldap server on the given port and SSL"
+  []
   (stop!)
-  (reset! server (start-ldap-server port ssl-port))
-  (let [conn (ldap/connect {:host {:address "localhost" :port port}})]
+  (reset! server (start-ldap-server))
+  (let [conn (.getConnection @server)]
     (add-toplevel-objects! conn)))

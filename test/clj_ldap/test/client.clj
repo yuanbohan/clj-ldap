@@ -1,14 +1,11 @@
 (ns clj-ldap.test.client
   "Automated tests for clj-ldap"
-  (:require [clj-ldap.client :as ldap])
-  (:require [clj-ldap.test.server :as server])
-  (:use clojure.test)
-  (:import [com.unboundid.ldap.sdk LDAPException]))
+  (:require [clj-ldap.client :as ldap]
+            [clj-ldap.test.server :as server])
+  (:use clojure.test))
 
 
-;; Tests are run over a variety of connection types
-(def port* 1389)
-(def ssl-port* 1636)
+;; Tests are run over a variety of connection types (LDAP and LDAPS for now)
 (def ^:dynamic *connections* nil)
 (def ^:dynamic *conn* nil)
 
@@ -74,12 +71,11 @@
                   :num-connections 5})  
    ])
 
-
 (defn- test-server
   "Setup server"
   [f]
-  (server/start! port* ssl-port*)
-  (binding [*connections* (connect-to-server port* ssl-port*)]
+  (server/start!)
+  (binding [*connections* (connect-to-server (server/ldapPort) (server/ldapsPort))]
     (f))
   (server/stop!))
 
@@ -122,7 +118,7 @@
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)
-                      {:add {:objectClass "residentialperson"
+                      {:add {:objectClass "organizationalPerson"
                              :l "Hollywood"}})
          success*))
   (is (= (ldap/modify
@@ -134,7 +130,7 @@
         obj-a (:object person-a*)
         obj-b (:object person-b*)]
     (is  (= (:objectClass new-a)
-            (conj (:objectClass obj-a) "residentialPerson")))
+            (conj (:objectClass obj-a) "organizationalPerson")))
     (is (= (:l new-a) "Hollywood"))
     (is (= (set (:telephoneNumber new-b))
            (set (concat (:telephoneNumber obj-b)
