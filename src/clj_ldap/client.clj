@@ -508,7 +508,7 @@ returned either before or after the modifications have taken place."
 
 ;; For the following search functions.
 ;; Options is a map with the following optional entries:
-;;    :scope       The search scope, can be :base :one :sub or "subordinate,
+;;    :scope       The search scope, can be :base :one :sub or :subordinate,
 ;;                 defaults to :sub
 ;;    :filter      A string representing the search filter,
 ;;                 defaults to \"(objectclass=*)\"
