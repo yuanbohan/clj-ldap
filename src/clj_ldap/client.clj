@@ -33,7 +33,9 @@
             PostReadRequestControl
             PreReadResponseControl
             PostReadResponseControl
-            SimplePagedResultsControl])
+            SimplePagedResultsControl
+            ServerSideSortRequestControl
+            SortKey])
   (:import [com.unboundid.util
             Base64])
   (:import [com.unboundid.util.ssl
@@ -344,20 +346,44 @@
     :else                  (into-array java.lang.String
                                        (map name attrs))))
 
+(defn- sortOrder
+  "Convert friendly name to boolean according to ServerSideSort control"
+  [order]
+  (condp = order
+        :ascending false
+        :descending true
+        :else false))
+
+(defn- createServerSideSort
+  "Create a ServerSideSortRequestControl base on the provided map with
+  keys :isCritical and :sortKeys. The former is boolean valued while the latter
+  is a vector: [:attr1 :ascending :attr2 :descending ... ].
+  Throw an exception if no sortKey is defined. If :isCritical is not defined,
+  assume false."
+  [{:keys [isCritical sortKeys] :or { isCritical false sortKeys []}}]
+  (if (not (empty? sortKeys))
+    (let [keylist (map (fn [[k v]] (SortKey. (name k) (sortOrder v)))
+                       (apply array-map sortKeys))]
+      (ServerSideSortRequestControl. isCritical (into-array SortKey keylist)))
+    (throw (Exception. "Error: The search option 'serverSort' requires
+                        non-empty sortKeys"))))
+
 (defn- search-criteria
   "Given a map of search criteria and possibly other keys, return the same map
    with search criteria keys rewritten ready for passing to search functions."
   [base {:keys [scope filter attributes sizeLimit timeLimit typesOnly controls
-                respf!]
+                respf! serverSort]
          :as original
          :or {sizeLimit 0 timeLimit 0 typesOnly false filter "(objectclass=*)"
-              controls [] respf! nil}}]
+              controls [] respf! nil serverSort nil}}]
   (merge original {:base       base
                    :scope      (get-scope scope)
                    :filter     filter
                    :attributes (get-attributes attributes)
                    :sizeLimit  sizeLimit :timeLimit timeLimit :typesOnly typesOnly
-                   :controls   controls}))
+                   :controls   (if (not-nil? serverSort)
+                                 (cons (createServerSideSort serverSort) controls)
+                                 controls)}))
 
 ;;=========== API ==============================================================
 
@@ -511,15 +537,21 @@ returned either before or after the modifications have taken place."
 ;;    :scope       The search scope, can be :base :one :sub or :subordinate,
 ;;                 defaults to :sub
 ;;    :filter      A string representing the search filter,
-;;                 defaults to \"(objectclass=*)\"
+;;                 defaults to "(objectclass=*)"
 ;;    :attributes  A collection of the attributes to return,
 ;;                 defaults to all user attributes
 ;;    :sizeLimit   The maximum number of entries that the server should return
 ;;    :timeLimit   The maximum length of time in seconds that the server should
 ;;                 spend processing this request
 ;;    :typesOnly   Return only attribute names instead of names and values
+;;    :serverSort  Instruct the server to sort the results. The value of this
+;;                 key is a map like the following:
+;;                   :isCritical ( true | false )
+;;                   :sortKeys [ :cn :ascending
+;;                               :employeNumber :descending ... ]
+;;                 At least one sort key must be provided.
 ;;    :controls    Adds the provided controls for this request.
-;;    :respf!     Applys this function to all response controls present.
+;;    :respf!      Applys this function to all response controls present.
 
 (defn search-all
   "Uses SimplePagedResultsControl to search on the connected ldap server, reads

@@ -18,7 +18,7 @@
   <scm>
     <connection>scm:git:git://github.com/bskinny/clj-ldap.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/bskinny/clj-ldap.git</developerConnection>
-    <tag>7bc5418f0f6e0a8814d3aed9593092dee3e61e57
+    <tag>55be9af19e87f6c07b71de9cdce846a373b1ea8b
 </tag>
     <url>https://github.com/bskinny/clj-ldap</url>
   </scm>

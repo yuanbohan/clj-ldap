@@ -161,6 +161,7 @@ memory and returns the results as a sequence of maps. An introduction
 to ldap searching can be found in this [article](http://www.enterprisenetworkingplanet.com/netsysm/article.php/3317551/Unmasking-the-LDAP-Search-Filter.htm).
 
 Options is a map with the following optional entries:
+
     :scope       The search scope, can be :base :one :sub or :subordinate,
                  defaults to :sub
     :filter      A string representing the search filter,
@@ -171,24 +172,30 @@ Options is a map with the following optional entries:
     :timeLimit   The maximum length of time in seconds that the server should
                  spend processing this request
     :typesOnly   Return only attribute names instead of names and values
+    :serverSort  Instruct the server to sort the results. The value of this
+                 key is a map like the following:
+                 { :isCritical ( true | false )
+                   :sortKeys [ :cn :ascending
+                               :employeNumber :descending ... ] }
+                 At least one sort key must be provided.
     :controls    Adds the provided controls for this request.
     :respf!      Applies this function to the list of response controls present.
+
 e.g
 
     (ldap/search conn "ou=people,dc=example,dc=com")
     
     (ldap/search conn "ou=people,dc=example,dc=com" {:attributes [:cn] :sizelimit 100})
 
-Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) on error.
+Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) on error. This function will not throw the exception in the event
+of a size limit exceeded result, instead the entries are returned.
 
 ## search! [connection base f]   [connection base options f]
 
 Runs a search on the connected ldap server and executes the given
 function (for side effects) on each result. Does not read all the
 results into memory. The options argument is a map similar to that of the search
-function defined above.
-
-e.g
+function defined above. e.g
 
      (ldap/search! conn "ou=people,dc=example,dc=com" println)
      
@@ -197,7 +204,7 @@ e.g
                         (fn [x]
                            (println "Hello " (:cn x))))
 
-Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) if an error occurs during search. Throws an [EntrySourceException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/EntrySourceException.html) if there is an eror obtaining search results. 
+Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) if an error occurs during search. Throws an [EntrySourceException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/EntrySourceException.html) if there is an error obtaining search results.
 
 ## delete [connection dn] [connection dn options]
 

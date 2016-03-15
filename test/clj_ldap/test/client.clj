@@ -185,6 +185,12 @@
                    (ldap/search *conn* base*
                                 {:attributes [:cn] :filter "cn=test*"})))
          (set ["testa" "testb"])))
+  (is (= (map :cn
+              (ldap/search *conn* base*
+                           {:filter "cn=*"
+                            :serverSort {:isCritical true
+                                         :sortKeys [:cn :ascending]}}))
+         '("Saul Hazledine" "testa" "testb")))
   (binding [*side-effects* #{}]
     (ldap/search! *conn* base* {:attributes [:cn :sn] :filter "cn=test*"}
                   (fn [x]
