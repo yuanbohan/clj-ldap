@@ -7,3 +7,7 @@ target
 #*#
 .#*
 .DS_Store
+.idea
+clj-ldap.iml
+test-resources/access
+test-resources/access.lck
