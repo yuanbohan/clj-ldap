@@ -12,6 +12,7 @@ performed with a pool..bindAndRevertAuthentication which returns the autherizati
 - If passed an individual LDAPConnection (which can be retrieved via (.getConnection pool), then
 the BIND is performed as usual and the caller is responsible for using (..releaseAndReAuthenticateConnection pool conn)
 to release the connection back to the pool.
+
 ### Added
 - size-limit, time-limit, types-only options to search.
 - controls option to search. This allows passing in arbitrary controls which have been properly instantiated via java interOp.
@@ -19,5 +20,6 @@ to release the connection back to the pool.
 - server-sort option to search which attaches a ServerSideSortRequestControl to the search operation.
 - Who Am I? extended request.
 - Unit tests for the above.
+
 ### Replaced
 - test.server has been rewritten to incorporate the InMemoryDirectoryServer provided in the UnboundID LDAP SDK.
