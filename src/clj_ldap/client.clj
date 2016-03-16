@@ -27,7 +27,9 @@
             Control])
   (:import [com.unboundid.ldap.sdk.extensions
             PasswordModifyExtendedRequest
-            PasswordModifyExtendedResult])
+            PasswordModifyExtendedResult
+            WhoAmIExtendedRequest
+            WhoAmIExtendedResult])
   (:import [com.unboundid.ldap.sdk.controls
             PreReadRequestControl
             PostReadRequestControl
@@ -417,11 +419,6 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
-(defn close
-  "Close the connection"
-  [connection]
-  (.close connection))
-
 (defn bind?
   "Performs a bind operation using the provided connection, bindDN and
 password. Returns true if successful.
@@ -436,9 +433,24 @@ the bind attempt will have no side-effects, leaving the state of the
 underlying connections unchanged."
   [connection bind-dn password]
   (try
-    (let [bind-result (.bind connection bind-dn password)]
-      (if (= ResultCode/SUCCESS (.getResultCode bind-result)) true false))
+    (let [r (if (instance? LDAPConnectionPool connection)
+              (.bindAndRevertAuthentication connection bind-dn password nil)
+              (.bind connection bind-dn password))]
+      (= ResultCode/SUCCESS (.getResultCode r)))
     (catch Exception _ false)))
+
+(defn who-am-i
+  "Return the authorization identity associated with this connection."
+  [connection]
+  (let [^WhoAmIExtendedResult res (.processExtendedOperation
+                                    connection (WhoAmIExtendedRequest.))]
+    (if (= ResultCode/SUCCESS (.getResultCode res))
+      (let [authz-id (.getAuthorizationID res)]
+        (cond
+          (or (= authz-id "") (= authz-id "dn:")) ""
+          (.startsWith authz-id "dn:") (subs authz-id 3)
+          (.startsWith authz-id "u:") (subs authz-id 2)
+          :else authz-id)))))
 
 (defn get
   "If successful, returns a map containing the entry for the given DN.
