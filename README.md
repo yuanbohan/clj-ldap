@@ -168,18 +168,18 @@ Options is a map with the following optional entries:
                  defaults to "(objectclass=*)"
     :attributes  A collection of the attributes to return,
                  defaults to all user attributes
-    :sizeLimit   The maximum number of entries that the server should return
-    :timeLimit   The maximum length of time in seconds that the server should
+    :size-limit  The maximum number of entries that the server should return
+    :time-limit  The maximum length of time in seconds that the server should
                  spend processing this request
-    :typesOnly   Return only attribute names instead of names and values
-    :serverSort  Instruct the server to sort the results. The value of this
+    :types-only  Return only attribute names instead of names and values
+    :server-sort Instruct the server to sort the results. The value of this
                  key is a map like the following:
-                 { :isCritical ( true | false )
-                   :sortKeys [ :cn :ascending
-                               :employeNumber :descending ... ] }
+                 { :is-critical ( true | false )
+                   :sort-keys [ :cn :ascending
+                                :employeNumber :descending ... ] }
                  At least one sort key must be provided.
     :controls    Adds the provided controls for this request.
-    :respf!      Applies this function to the list of response controls present.
+    :respf       Applies this function to the list of response controls present.
 
 e.g
 

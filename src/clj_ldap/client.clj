@@ -261,12 +261,12 @@
 (defn- search-all-results
   "Returns a sequence of search results via paging so we don't run into
    size limits with the number of results."
-  [connection {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
-                      controls]}]
+  [connection {:keys [base scope filter attributes size-limit time-limit
+                      types-only controls]}]
   (let [pageSize 500
         cookie nil
         req (SearchRequest. base scope DereferencePolicy/NEVER
-                            sizeLimit timeLimit typesOnly filter attributes)
+                            size-limit time-limit types-only filter attributes)
         - (and (not (empty? controls))
                (.addControls req (into-array Control controls)))]
     (loop [results []
@@ -287,20 +287,20 @@
 (defn- search-results
   "Returns a sequence of search results for the given search criteria.
    Ignore a size limit exceeded exception if one occurs. If the caller
-   provided a respf! then apply the function to any response controls."
-  [conn {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
-                controls respf!]}]
+   provided a respf then apply the function to any response controls."
+  [conn {:keys [base scope filter attributes size-limit time-limit types-only
+                controls respf]}]
   (try
-    (let [req (SearchRequest. base scope DereferencePolicy/NEVER sizeLimit
-                              timeLimit typesOnly filter attributes)
+    (let [req (SearchRequest. base scope DereferencePolicy/NEVER size-limit
+                              time-limit types-only filter attributes)
           - (and (not (empty? controls))
                  (.addControls req (into-array Control controls)))
           res (.search conn req)]
-      (when (not-nil? respf!) (respf! (.getResponseControls res)))
+      (when (not-nil? respf) (respf (.getResponseControls res)))
       (if (> (.getEntryCount res) 0)
        (map entry-as-map (.getSearchEntries res))))
     (catch LDAPSearchException e
-      (when (not-nil? respf!) (respf! (.getResponseControls e)))
+      (when (not-nil? respf) (respf (.getResponseControls e)))
       (if (= ResultCode/SIZE_LIMIT_EXCEEDED (.getResultCode e))
         (map entry-as-map (.getSearchEntries e))
         (throw e)))))
@@ -308,17 +308,17 @@
 (defn- search-results!
   "Call the given function with the results of the search using
    the given search criteria"
-  [pool {:keys [base scope filter attributes sizeLimit timeLimit typesOnly
-                controls respf!]} f]
+  [pool {:keys [base scope filter attributes size-limit time-limit types-only
+                controls respf]} f]
   (let [req (SearchRequest. base scope DereferencePolicy/NEVER
-                            sizeLimit timeLimit typesOnly filter attributes)
+                            size-limit time-limit types-only filter attributes)
         - (and (not (empty? controls))
                (.addControls req (into-array Control controls)))
         conn (.getConnection pool)]
     (try
       (with-open [source (LDAPEntrySource. conn req false)]
         (let [res (.getSearchResult source)]
-          (when (not-nil? respf!) (respf! (.getResponseControls res)))
+          (when (not-nil? respf) (respf (.getResponseControls res)))
           (doseq [i (remove empty?
                            (map entry-as-map (entry-seq source)))]
            (f i))))
@@ -356,33 +356,35 @@
 
 (defn- createServerSideSort
   "Create a ServerSideSortRequestControl base on the provided map with
-  keys :isCritical and :sortKeys. The former is boolean valued while the latter
+  keys :is-critical and :sort-keys. The former is boolean valued while the latter
   is a vector: [:attr1 :ascending :attr2 :descending ... ].
-  Throw an exception if no sortKey is defined. If :isCritical is not defined,
+  Throw an exception if no sortKey is defined. If :is-critical is not defined,
   assume false."
-  [{:keys [isCritical sortKeys] :or { isCritical false sortKeys []}}]
-  (if (not (empty? sortKeys))
+  [{:keys [is-critical sort-keys] :or { is-critical false sort-keys []}}]
+  (if (not (empty? sort-keys))
     (let [keylist (map (fn [[k v]] (SortKey. (name k) (sortOrder v)))
-                       (apply array-map sortKeys))]
-      (ServerSideSortRequestControl. isCritical (into-array SortKey keylist)))
-    (throw (Exception. "Error: The search option 'serverSort' requires
-                        non-empty sortKeys"))))
+                       (apply array-map sort-keys))]
+      (ServerSideSortRequestControl. is-critical (into-array SortKey keylist)))
+    (throw (Exception. "Error: The search option 'server-sort' requires
+                        non-empty sort-keys"))))
 
 (defn- search-criteria
   "Given a map of search criteria and possibly other keys, return the same map
    with search criteria keys rewritten ready for passing to search functions."
-  [base {:keys [scope filter attributes sizeLimit timeLimit typesOnly controls
-                respf! serverSort]
+  [base {:keys [scope filter attributes size-limit time-limit types-only
+                controls respf server-sort]
          :as original
-         :or {sizeLimit 0 timeLimit 0 typesOnly false filter "(objectclass=*)"
-              controls [] respf! nil serverSort nil}}]
+         :or {size-limit 0 time-limit 0 types-only false
+              filter "(objectclass=*)" controls [] respf nil server-sort nil}}]
   (merge original {:base       base
                    :scope      (get-scope scope)
                    :filter     filter
                    :attributes (get-attributes attributes)
-                   :sizeLimit  sizeLimit :timeLimit timeLimit :typesOnly typesOnly
-                   :controls   (if (not-nil? serverSort)
-                                 (cons (createServerSideSort serverSort) controls)
+                   :size-limit  size-limit :time-limit time-limit
+                   :types-only types-only
+                   :controls   (if (not-nil? server-sort)
+                                 (cons (createServerSideSort server-sort)
+                                       controls)
                                  controls)}))
 
 ;;=========== API ==============================================================
@@ -540,18 +542,18 @@ returned either before or after the modifications have taken place."
 ;;                 defaults to "(objectclass=*)"
 ;;    :attributes  A collection of the attributes to return,
 ;;                 defaults to all user attributes
-;;    :sizeLimit   The maximum number of entries that the server should return
-;;    :timeLimit   The maximum length of time in seconds that the server should
+;;    :size-limit  The maximum number of entries that the server should return
+;;    :time-limit  The maximum length of time in seconds that the server should
 ;;                 spend processing this request
-;;    :typesOnly   Return only attribute names instead of names and values
-;;    :serverSort  Instruct the server to sort the results. The value of this
+;;    :types-only  Return only attribute names instead of names and values
+;;    :server-sort Instruct the server to sort the results. The value of this
 ;;                 key is a map like the following:
-;;                   :isCritical ( true | false )
-;;                   :sortKeys [ :cn :ascending
-;;                               :employeNumber :descending ... ]
+;;                   :is-critical ( true | false )
+;;                   :sort-keys [ :cn :ascending
+;;                                :employeNumber :descending ... ]
 ;;                 At least one sort key must be provided.
 ;;    :controls    Adds the provided controls for this request.
-;;    :respf!      Applys this function to all response controls present.
+;;    :respf       Applys this function to all response controls present.
 
 (defn search-all
   "Uses SimplePagedResultsControl to search on the connected ldap server, reads
