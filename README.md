@@ -49,17 +49,17 @@ Options is a map with the following entries:
                      (milliseconds), defaults to 5 minutes
 
 Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
+Some examples:
 
-An example:
     (ldap/connect conn {:host "ldap.example.com" :num-connections 10})
     
-    (ldap/connect conn {:host [{:address "ldap1.example.com" :port 8000}
+    (ldap/connect conn {:host [{:address "ldap1.example.com" :port 1389}
                                {:address "ldap3.example.com"}
-                               "ldap2.example.com:8001"]
+                               "ldap2.example.com:1389"]
                         :ssl? true
                         :num-connections 9})
                         
-    (ldap/connect conn {:host {:port 8000}})
+    (ldap/connect conn {:host {:port 1389}})
                                
 
 ## bind? [connection bind-dn password] [connection-pool bind-dn password]
