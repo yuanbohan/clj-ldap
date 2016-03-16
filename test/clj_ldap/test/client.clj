@@ -188,9 +188,23 @@
   (is (= (map :cn
               (ldap/search *conn* base*
                            {:filter "cn=*"
-                            :serverSort {:isCritical true
-                                         :sortKeys [:cn :ascending]}}))
+                            :server-sort {:is-critical true
+                                          :sort-keys [:cn :ascending]}}))
          '("Saul Hazledine" "testa" "testb")))
+  (is (= (count (map :cn
+                     (ldap/search *conn* base*
+                                  {:attributes [:cn] :filter "cn=*"
+                                   :size-limit 2})))
+         2))
+  (is (= (:description (map :cn
+                            (ldap/search *conn* base*
+                                        {:attributes [:cn] :filter "cn=testb"
+                                         :types-only true})))
+         nil))
+  (is (= (set (map :description
+                   (ldap/search *conn* base*
+                                {:filter "cn=testb" :types-only false})))
+         (set ["description b"])))
   (binding [*side-effects* #{}]
     (ldap/search! *conn* base* {:attributes [:cn :sn] :filter "cn=test*"}
                   (fn [x]
