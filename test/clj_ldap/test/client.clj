@@ -8,6 +8,7 @@
 ;; Tests are run over a variety of connection types (LDAP and LDAPS for now)
 (def ^:dynamic *connections* nil)
 (def ^:dynamic *conn* nil)
+(def ^:dynamic *c* nil)
 
 ;; Tests concentrate on a single object class
 (def base* "ou=people,dc=alienscience,dc=org,dc=uk")
@@ -107,6 +108,18 @@
           :cn (-> person-a* :object :cn)
           :sn (-> person-a* :object :sn)})))
 
+(deftest test-bind
+  (if (> (-> *conn*
+             (.getConnectionPoolStatistics)
+             (.getMaximumAvailableConnections)) 1)
+    (binding [*c* (.getConnection *conn*)]
+      (let [before (ldap/who-am-i *c*)
+            _ (ldap/bind? *c* (:dn person-a*) "passa")
+            a (ldap/who-am-i *c*)
+            _ (.releaseAndReAuthenticateConnection *conn* *c*)]
+        (is (= [before a])
+           ["" (:dn person-a*)])))))
+
 (deftest test-add-delete
   (is (= (ldap/add *conn* (:dn person-c*) (:object person-c*))
          success*))
@@ -175,7 +188,6 @@
       (is (= (set (:telephoneNumber new-b))
              (set [(first b-phonenums) "0000000005"])))
       (is (= (:description new-b) "desc x")))))
-
 
 (deftest test-search
   (is (= (set (map :cn
