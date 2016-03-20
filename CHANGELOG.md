@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.0.10]
-### Modify Fix
+### Binary (byte-array) attribute values
 The behavior of the api towards binary valued attributes has been fixed. Thanks to Ray Miller for providing the 
 changes to create-modification. In addition, the api now returns binary data as it was orginally submitted as opposed
 to base64 encoded. Base64 encoding is only needed if the client requests a text representation of the LDAP entry, such as LDIF.
