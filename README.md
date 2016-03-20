@@ -2,11 +2,12 @@
 # Introduction
 
 clj-ldap is a thin layer on the [unboundid sdk](http://www.unboundid.com/products/ldap-sdk/) and allows clojure programs to talk to ldap servers. This library is available on [clojars.org](http://clojars.org/search?q=clj-ldap)
-
+```clojure
      :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.10"]]
-
+```
 # Example 
 
+```clojure
     (ns example
       (:require [clj-ldap.client :as ldap]))
       
@@ -23,6 +24,7 @@ clj-ldap is a thin layer on the [unboundid sdk](http://www.unboundid.com/product
      :cn "dude"
      :uid "dude"
      :homeDirectory "/home/dude"}
+```
 
 # API
 
@@ -50,7 +52,7 @@ Options is a map with the following entries:
 
 Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
 Some examples:
-
+```clojure
     (ldap/connect conn {:host "ldap.example.com" :num-connections 10})
     
     (ldap/connect conn {:host [{:address "ldap1.example.com" :port 1389}
@@ -60,13 +62,14 @@ Some examples:
                         :num-connections 9})
                         
     (ldap/connect conn {:host {:port 1389}})
-                               
+```
 
 ## bind? [connection bind-dn password] [connection-pool bind-dn password]
 
-Usage: 
+Usage:
+```clojure
     (ldap/bind? conn "cn=dude,ou=people,dc=example,dc=com" "somepass")
-
+```
 Performs a bind operation using the provided connection, bindDN and
 password. Returns true if successful.
 
@@ -83,33 +86,34 @@ underlying connections unchanged.
   
 If successful, returns a map containing the entry for the given DN.
 Returns nil if the entry doesn't exist. 
-
+```clojure
     (ldap/get conn "cn=dude,ou=people,dc=example,dc=com")
-
+```
 Takes an optional collection that specifies which attributes will be returned from the server.
-
+```clojure
     (ldap/get conn "cn=dude,ou=people,dc=example,dc=com" [:cn :sn])
-
+```
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) on error.
 
 ## add [connection dn entry]
 
 Adds an entry to the connected ldap server. The entry is map of keywords to values which can be strings, sets or vectors.
 
-
+```clojure
     (ldap/add conn "cn=dude,ou=people,dc=example,dc=com"
                    {:objectClass #{"top" "person"}
                     :cn "dude"
                     :sn "a"
                     :description "His dudeness"
                     :telephoneNumber ["1919191910" "4323324566"]})
-                    
+```
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if there is an error with the request or the add failed.
 
 ## modify [connection dn modifications]                    
 
 Modifies an entry in the connected ldap server. The modifications are
 a map in the form:
+```clojure
      {:add
         {:attribute-a some-value
          :attribute-b [value1 value2]}
@@ -126,30 +130,31 @@ a map in the form:
         #{:attribute-a :attribute-b}
       :post-read
         #{:attribute-c :attribute-d}}
-
+```
 Where :add adds an attribute value, :delete deletes an attribute value and :replace replaces the set of values for the attribute with the ones specified. The entries :pre-read and :post-read specify attributes that have be read and returned either before or after the modifications have taken place. 
 
 All the keys in the map are optional e.g:
-
+```clojure
      (ldap/modify conn "cn=dude,ou=people,dc=example,dc=com"
                   {:add {:telephoneNumber "232546265"}})
-
+```
 The values in the map can also be set to :all when doing a delete e.g:
-
+```clojure
      (ldap/modify conn "cn=dude,ou=people,dc=example,dc=com"
                   {:delete {:telephoneNumber :all}})
-
+```
 The values of the attributes given in :pre-read and :post-read are available in the returned map and are part of an atomic ldap operation e.g
-
+```clojure
      (ldap/modify conn "uid=maxuid,ou=people,dc=example,dc=com"
                   {:increment {:uidNumber 1}
                    :post-read #{:uidNumber}})
-     
-     returns> 
+```
+     returns
+```clojure
        {:code 0
         :name "success"
         :post-read {:uidNumber "2002"}}
-
+```
 The above technique can be used to maintain counters for unique ids as described by [rfc4525](http://tools.ietf.org/html/rfc4525).
 
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) on error.
@@ -182,11 +187,11 @@ Options is a map with the following optional entries:
     :respf       Applies this function to the list of response controls present.
 
 e.g
-
+```clojure
     (ldap/search conn "ou=people,dc=example,dc=com")
     
     (ldap/search conn "ou=people,dc=example,dc=com" {:attributes [:cn] :sizelimit 100})
-
+```
 Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) on error. This function will not throw the exception in the event
 of a size limit exceeded result, instead the entries are returned.
 
@@ -196,23 +201,23 @@ Runs a search on the connected ldap server and executes the given
 function (for side effects) on each result. Does not read all the
 results into memory. The options argument is a map similar to that of the search
 function defined above. e.g
-
+```clojure
      (ldap/search! conn "ou=people,dc=example,dc=com" println)
      
      (ldap/search! conn "ou=people,dc=example,dc=com"
                         {:filter "sn=dud*"}
                         (fn [x]
                            (println "Hello " (:cn x))))
-
+```
 Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) if an error occurs during search. Throws an [EntrySourceException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/EntrySourceException.html) if there is an error obtaining search results.
 
 ## delete [connection dn] [connection dn options]
 
 Deletes the given entry in the connected ldap server. Optionally takes a map that can contain the entry :pre-read to indicate the attributes that should be read before deletion.
-
+```clojure
      (ldap/delete conn "cn=dude,ou=people,dc=example,dc=com")
 
      (ldap/delete conn "cn=dude,ou=people,dc=example,dc=com" 
                        {:pre-read #{"telephoneNumber"}})
-                       
+```
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if the object does not exist or an error occurs.
