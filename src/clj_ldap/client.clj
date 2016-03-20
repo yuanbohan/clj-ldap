@@ -49,10 +49,25 @@
 
 (def not-nil? (complement nil?))
 
-(defn encode [attr]
-  (if (.needsBase64Encoding attr)
-    (Base64/encode (.getValueByteArray attr))
+(defmulti ^:private get-value (fn [attr] (.needsBase64Encoding attr)))
+
+(defmethod ^:private get-value true
+  [attr]
+  (if (> (.size attr) 1)
+    (vec (.getValueByteArrays attr))
+    (.getValueByteArray attr)))
+
+(defmethod ^:private get-value false
+  [attr]
+  (if (> (.size attr) 1)
+    (vec (.getValues attr))
     (.getValue attr)))
+
+(defn- encodeBase64 [attr]
+  "Can be used to produce LDIF"
+  (if (> (.size attr) 1)
+    (map #(Base64/encode %) (get-value attr))
+    (Base64/encode (get-value attr))))
 
 (defn- extract-attribute
   "Extracts [:name value] from the given attribute object. Converts
@@ -60,9 +75,8 @@
   [attr]
   (let [k (keyword (.getName attr))]
     (cond
-      (= :objectClass k)     [k (set (vec (.getValues attr)))]
-      (> (.size attr) 1)     [k (vec (.getValues attr))]
-      :else                  [k (encode attr)])))
+      (= :objectClass k)     [k (set (get-value attr))]
+      :else                  [k (get-value attr)])))
 
 (defn- entry-as-map
   "Converts an Entry object into a map optionally adding the DN"
@@ -200,13 +214,24 @@
   (doseq [[k v] m]
     (set-entry-kv! entry-obj k v)))
 
+(defn- byte-array?
+  [v]
+  (= (type v) (type (byte-array 0))))
+
 (defn- create-modification
   "Creates a modification object"
   [modify-op attribute values]
   (cond
-    (coll? values)    (Modification. modify-op attribute (into-array values))
-    (= :all values)   (Modification. modify-op attribute)
-    :else             (Modification. modify-op attribute (str values))))
+    (and (coll? values) (byte-array? (first values)))
+      (Modification. modify-op attribute (into-array values))
+    (coll? values)
+      (Modification. modify-op attribute (into-array String (map str values)))
+    (= :all values)
+      (Modification. modify-op attribute)
+    (byte-array? values)
+      (Modification. modify-op attribute values)
+    :else
+      (Modification. modify-op attribute (str values))))
 
 (defn- modify-ops
   "Returns a sequence of Modification objects to do the given operation
