@@ -21,6 +21,15 @@
 ;; Result of a successful write
 (def success*      {:code 0 :name "success"})
 
+(defn read-bytes-from-file
+  [filename]
+  (let [f (java.io.File. filename)
+        ary (byte-array (.length f))
+        is (java.io.FileInputStream. f)]
+    (.read is ary)
+    (.close is)
+    ary))
+
 ;; People to test with
 (def person-a*
      {:dn (format dn* "testa")
@@ -127,7 +136,17 @@
          (assoc (:object person-c*) :dn (:dn person-c*))))
   (is (= (ldap/delete *conn* (:dn person-c*))
          success*))
-  (is (nil? (ldap/get *conn* (:dn person-c*)))))
+  (is (nil? (ldap/get *conn* (:dn person-c*))))
+  (is (= (ldap/add *conn* (str "changeNumber=1234," base*)
+                   {:objectClass ["changeLogEntry"]
+                    :changeNumber 1234
+                    :targetDN base*
+                    :changeType "modify"})
+         success*))
+  (is (= (:changeNumber (ldap/get *conn* (str "changeNumber=1234," base*)))
+         "1234"))
+  (is (= (ldap/delete *conn* (str "changeNumber=1234," base*))
+         success*)))
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)
@@ -167,14 +186,23 @@
                (assoc :dn (:dn person-b*)))))))
 
 (deftest test-modify-replace
-  (let [new-phonenums (-> person-b* :object :telephoneNumber)]
+  (let [new-phonenums (-> person-b* :object :telephoneNumber)
+        certificate-data (read-bytes-from-file
+                           "test-resources/cert.binary")]
     (is (= (ldap/modify *conn* (:dn person-a*)
                         {:replace {:telephoneNumber new-phonenums}})
            success*))
     (is (= (ldap/get *conn* (:dn person-a*))
            (-> (:object person-a*)
                (assoc :telephoneNumber new-phonenums)
-               (assoc :dn (:dn person-a*)))))))
+               (assoc :dn (:dn person-a*)))))
+    (is (= (ldap/modify *conn* (:dn person-a*)
+                        {:add {:objectclass ["inetOrgPerson"
+                                             "organizationalPerson"]
+                               :userCertificate certificate-data}})
+           success*))
+    (is (= (seq (:userCertificate (ldap/get *conn* (:dn person-a*))))
+           (seq certificate-data)))))
 
 (deftest test-modify-all
   (let [b (:object person-b*)
