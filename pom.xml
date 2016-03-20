@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>pauldorman</groupId>
+  <groupId>org.clojars.pntblnk</groupId>
   <artifactId>clj-ldap</artifactId>
   <packaging>jar</packaging>
   <version>0.0.10</version>
@@ -18,7 +18,7 @@
   <scm>
     <connection>scm:git:git://github.com/pauldorman/clj-ldap.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/pauldorman/clj-ldap.git</developerConnection>
-    <tag>3a95e6a1bfe6f9f1da914f2b856141b17b0b2f82
+    <tag>b14973e70e4511a3dd6d1e2854610b1847fa0e40
 </tag>
     <url>https://github.com/pauldorman/clj-ldap</url>
   </scm>
