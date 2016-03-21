@@ -4,6 +4,9 @@ classes
 lib
 target
 .lein*
+pom.xml
+pom.xml.asc
+.nrepl-port
 #*#
 .#*
 .DS_Store
