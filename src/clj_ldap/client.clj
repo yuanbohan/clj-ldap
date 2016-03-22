@@ -1,7 +1,8 @@
 (ns clj-ldap.client
   "LDAP client"
   (:refer-clojure :exclude [get])
-  (:require [clojure.string :as string])
+  (:require [clojure.string :as string]
+            [clojure.pprint :refer (pprint)])
   (:import [com.unboundid.ldap.sdk
             LDAPResult
             LDAPConnectionOptions
@@ -49,16 +50,17 @@
 
 (def not-nil? (complement nil?))
 
-(defmulti ^:private get-value (fn [attr] (.needsBase64Encoding attr)))
+;; Define get-value to return String or Bytes depending on boolean 'byte-value'
+(defmulti ^:private get-value (fn [attr byte-value] byte-value))
 
 (defmethod ^:private get-value true
-  [attr]
+  [attr _]
   (if (> (.size attr) 1)
     (vec (.getValueByteArrays attr))
     (.getValueByteArray attr)))
 
 (defmethod ^:private get-value false
-  [attr]
+  [attr _]
   (if (> (.size attr) 1)
     (vec (.getValues attr))
     (.getValue attr)))
@@ -71,33 +73,40 @@
 
 (defn- extract-attribute
   "Extracts [:name value] from the given attribute object. Converts
-   the objectClass attribute to a set."
-  [attr]
-  (let [k (keyword (.getName attr))]
+   the objectClass attribute to a set. The byte-valued collection is
+   referenced to detemine whether to return a String or byte array"
+  [attr byte-valued]
+  (let [k (keyword (.getName attr))
+        byte-value (contains? (set byte-valued) (keyword (.getName attr)))]
     (cond
-      (= :objectClass k)     [k (set (get-value attr))]
-      :else                  [k (get-value attr)])))
+      (= :objectClass k)     [k (set (get-value attr byte-value))]
+      :else                  [k (get-value attr byte-value)])))
 
 (defn- entry-as-map
-  "Converts an Entry object into a map optionally adding the DN"
-  ([entry]
-     (entry-as-map entry true))
-  ([entry dn?]
+  "Returns a closure which converts an Entry object into a map optionally
+   adding the DN. We pass along the byte-valued collection to properly
+   return binary data."
+  ([byte-valued]
+     (entry-as-map byte-valued true))
+  ([byte-valued dn?]
+   (fn [entry]
      (let [attrs (seq (.getAttributes entry))]
-       (if dn?
-         (apply hash-map :dn (.getDN entry)
-                (mapcat extract-attribute attrs))
-         (apply hash-map
-                (mapcat extract-attribute attrs))))))
+      (if dn?
+        (apply hash-map :dn (.getDN entry)
+               (mapcat #(extract-attribute % byte-valued) attrs))
+        (apply hash-map
+               (mapcat #(extract-attribute % byte-valued) attrs)))))))
 
 (defn- add-response-control
   "Adds the values contained in given response control to the given map"
   [m control]
   (condp instance? control
     PreReadResponseControl
-    (update-in m [:pre-read] merge (entry-as-map (.getEntry control) false))
+    (update-in m [:pre-read] merge ((entry-as-map [])
+                                     (.getEntry control) false))
     PostReadResponseControl
-    (update-in m [:post-read] merge (entry-as-map (.getEntry control) false))
+    (update-in m [:post-read] merge ((entry-as-map [])
+                                      (.getEntry control) false))
     m))
 
 (defn- add-response-controls
@@ -289,7 +298,7 @@
   "Returns a sequence of search results via paging so we don't run into
    size limits with the number of results."
   [connection {:keys [base scope filter attributes size-limit time-limit
-                      types-only controls]}]
+                      types-only controls byte-valued]}]
   (let [pageSize 500
         cookie nil
         req (SearchRequest. base scope DereferencePolicy/NEVER
@@ -302,7 +311,7 @@
       (let [res (.search connection req)
             control (SimplePagedResultsControl/get res)
             newres (->> (.getSearchEntries res)
-                     (map entry-as-map)
+                     (map (entry-as-map byte-valued))
                      (remove empty?)
                      (into results))]
         (if (and
@@ -316,7 +325,7 @@
    Ignore a size limit exceeded exception if one occurs. If the caller
    provided a respf then apply the function to any response controls."
   [conn {:keys [base scope filter attributes size-limit time-limit types-only
-                controls respf]}]
+                controls respf byte-valued]}]
   (try
     (let [req (SearchRequest. base scope DereferencePolicy/NEVER size-limit
                               time-limit types-only filter attributes)
@@ -325,18 +334,18 @@
           res (.search conn req)]
       (when (not-nil? respf) (respf (.getResponseControls res)))
       (if (> (.getEntryCount res) 0)
-       (map entry-as-map (.getSearchEntries res))))
+       (map (entry-as-map byte-valued) (.getSearchEntries res))))
     (catch LDAPSearchException e
       (when (not-nil? respf) (respf (.getResponseControls e)))
       (if (= ResultCode/SIZE_LIMIT_EXCEEDED (.getResultCode e))
-        (map entry-as-map (.getSearchEntries e))
+        (map (entry-as-map byte-valued) (.getSearchEntries e))
         (throw e)))))
 
 (defn- search-results!
   "Call the given function with the results of the search using
    the given search criteria"
   [pool {:keys [base scope filter attributes size-limit time-limit types-only
-                controls respf]} f]
+                controls respf byte-valued]} f]
   (let [req (SearchRequest. base scope DereferencePolicy/NEVER
                             size-limit time-limit types-only filter attributes)
         - (and (not (empty? controls))
@@ -347,7 +356,8 @@
         (let [res (.getSearchResult source)]
           (when (not-nil? respf) (respf (.getResponseControls res)))
           (doseq [i (remove empty?
-                           (map entry-as-map (entry-seq source)))]
+                           (map (entry-as-map byte-valued)
+                                (entry-seq source)))]
            (f i))))
       (.releaseConnection pool conn)
       (catch EntrySourceException e
@@ -399,9 +409,9 @@
   "Given a map of search criteria and possibly other keys, return the same map
    with search criteria keys rewritten ready for passing to search functions."
   [base {:keys [scope filter attributes size-limit time-limit types-only
-                controls respf server-sort]
+                controls respf server-sort byte-valued]
          :as original
-         :or {size-limit 0 time-limit 0 types-only false
+         :or {size-limit 0 time-limit 0 types-only false byte-valued []
               filter "(objectclass=*)" controls [] respf nil server-sort nil}}]
   (merge original {:base       base
                    :scope      (get-scope scope)
@@ -485,12 +495,14 @@ underlying connections unchanged."
   ([connection dn]
    (get connection dn nil))
   ([connection dn attributes]
+   (get connection dn attributes []))
+  ([connection dn attributes byte-valued]
    (if-let [result (if attributes
                      (.getEntry connection dn
                                 (into-array java.lang.String
                                             (map name attributes)))
                      (.getEntry connection dn))]
-      (entry-as-map result))))
+      ((entry-as-map byte-valued) result))))
 
 (defn add
   "Adds an entry to the connected ldap server. The entry is assumed to be
@@ -579,6 +591,8 @@ returned either before or after the modifications have taken place."
 ;;                 defaults to "(objectclass=*)"
 ;;    :attributes  A collection of the attributes to return,
 ;;                 defaults to all user attributes
+;;    :byte-valued A collection of attributes to return as byte arrays as
+;;                 opposed to Strings.
 ;;    :size-limit  The maximum number of entries that the server should return
 ;;    :time-limit  The maximum length of time in seconds that the server should
 ;;                 spend processing this request

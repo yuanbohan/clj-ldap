@@ -173,6 +173,8 @@ Options is a map with the following optional entries:
                  defaults to "(objectclass=*)"
     :attributes  A collection of the attributes to return,
                  defaults to all user attributes
+    :byte-valued A collection of attributes to return as byte arrays as
+                 opposed to Strings.
     :size-limit  The maximum number of entries that the server should return
     :time-limit  The maximum length of time in seconds that the server should
                  spend processing this request
@@ -191,6 +193,9 @@ e.g
     (ldap/search conn "ou=people,dc=example,dc=com")
     
     (ldap/search conn "ou=people,dc=example,dc=com" {:attributes [:cn] :sizelimit 100})
+
+    (ldap/search conn "dc=example,dc=com" {:filter "(uid=abc123)" :attributes [:cn :uid :userCertificate]
+                                           :byte-valued [:userCertificate]})
 ```
 Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPSearchException.html) on error. This function will not throw the exception in the event
 of a size limit exceeded result, instead the entries are returned.

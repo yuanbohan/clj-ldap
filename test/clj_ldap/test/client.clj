@@ -45,15 +45,15 @@
       :object {:objectClass object-class*
                :cn "testb"
                :sn "b"
-               :description "description b"
+               :description "István Orosz"
                :telephoneNumber ["000000002" "00000003"]
                :userPassword "passb"}})
 
 (def person-c*
-     {:dn (format dn* "testc")
+     {:dn (format dn* "André Marchand")
       :object {:objectClass object-class*
-               :cn "testc"
-               :sn "c"
+               :cn "André Marchand"
+               :sn "Marchand"
                :description "description c"
                :telephoneNumber "000000004"
                :userPassword "passc"}})
@@ -201,7 +201,16 @@
                                              "organizationalPerson"]
                                :userCertificate certificate-data}})
            success*))
-    (is (= (seq (:userCertificate (ldap/get *conn* (:dn person-a*))))
+    (is (= (seq (:userCertificate
+                  (first (ldap/search *conn* (:dn person-a*)
+                                      {:scope :base
+                                       :filter "(objectclass=inetorgperson)"
+                                       :attributes [:userCertificate]
+                                       :byte-valued [:userCertificate]}))))
+           (seq certificate-data)))
+    (is (= (seq (:userCertificate (ldap/get *conn* (:dn person-a*)
+                                            [:userCertificate]
+                                            [:userCertificate])))
            (seq certificate-data)))))
 
 (deftest test-modify-all
@@ -238,13 +247,14 @@
          2))
   (is (= (:description (map :cn
                             (ldap/search *conn* base*
-                                        {:attributes [:cn] :filter "cn=testb"
+                                        {:attributes [:cn]
+                                         :filter "cn=István Orosz"
                                          :types-only true})))
          nil))
   (is (= (set (map :description
                    (ldap/search *conn* base*
                                 {:filter "cn=testb" :types-only false})))
-         (set ["description b"])))
+         (set ["István Orosz"])))
   (binding [*side-effects* #{}]
     (ldap/search! *conn* base* {:attributes [:cn :sn] :filter "cn=test*"}
                   (fn [x]
