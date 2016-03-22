@@ -6,7 +6,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Binary (byte-array) attribute values
 The behavior of the api towards binary valued attributes has been fixed. Thanks to Ray Miller for providing the 
 changes to create-modification. In addition, the api now returns binary data as it was orginally submitted as opposed
-to base64 encoded. Base64 encoding is only needed if the client requests a text representation of the LDAP entry, such as LDIF.
+to base64 encoded. Base64 encoding is only needed if the client requests a text representation of the LDAP entry, such as LDIF. A byte-valued collection of attribute names (as keywords) can be provided to all search functions to instruct the api to return
+byte arrays as opposed to strings.
 
 ### Bind? Fix
 A bug was discovered and fixed in bind? which would leave connections in the pool with an authorization ID
@@ -19,7 +20,8 @@ the BIND is performed as usual and the caller is responsible for using (..releas
 to release the connection back to the pool.
 
 ### Added
-- size-limit, time-limit, types-only options to search.
+- size-limit, time-limit and types-only options to search.
+- byte-valued option to search functions which implies byte array values are to be returned for these attributes.
 - controls option to search. This allows passing in arbitrary controls which have been properly instantiated via java interOp.
 - respf option to search. This function, if defined, will be invoked on the list of response controls, if present.
 - server-sort option to search which attaches a ServerSideSortRequestControl to the search operation.
