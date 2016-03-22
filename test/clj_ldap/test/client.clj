@@ -208,6 +208,11 @@
                                        :attributes [:userCertificate]
                                        :byte-valued [:userCertificate]}))))
            (seq certificate-data)))
+    (is (= (seq (:userCertificate
+                  (first (ldap/search *conn* (:dn person-a*)
+                                      {:scope :base
+                                       :byte-valued [:userCertificate]}))))
+           (seq certificate-data)))
     (is (= (seq (:userCertificate (ldap/get *conn* (:dn person-a*)
                                             [:userCertificate]
                                             [:userCertificate])))
