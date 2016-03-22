@@ -590,7 +590,7 @@ returned either before or after the modifications have taken place."
 ;;                                :employeNumber :descending ... ]
 ;;                 At least one sort key must be provided.
 ;;    :controls    Adds the provided controls for this request.
-;;    :respf       Applys this function to all response controls present.
+;;    :respf       Applies this function to all response controls present.
 
 (defn search-all
   "Uses SimplePagedResultsControl to search on the connected ldap server, reads
