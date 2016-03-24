@@ -21,6 +21,7 @@ to release the connection back to the pool.
 
 ### Added
 - size-limit, time-limit and types-only options to search.
+- StartTLS support with the startTLS? boolean option to connect.
 - byte-valued option to search functions which implies byte array values are to be returned for these attributes.
 - controls option to search. This allows passing in arbitrary controls which have been properly instantiated via java interOp.
 - respf option to search. This function, if defined, will be invoked on the list of response controls, if present.
