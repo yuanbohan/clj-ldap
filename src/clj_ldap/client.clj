@@ -25,7 +25,8 @@
             SearchScope
             DereferencePolicy
             LDAPSearchException
-            Control])
+            Control
+            StartTLSPostConnectProcessor])
   (:import [com.unboundid.ldap.sdk.extensions
             PasswordModifyExtendedRequest
             PasswordModifyExtendedResult
@@ -132,6 +133,15 @@
     (when timeout         (.setResponseTimeoutMillis opt timeout))
     opt))
 
+(defn- create-ssl-context
+  "Returns a SSLContext object"
+  [{:keys [trust-store]}]
+  (let [trust-manager (if trust-store
+                        (TrustStoreTrustManager. trust-store)
+                        (TrustAllTrustManager.))
+        ssl-util (SSLUtil. trust-manager)]
+    (.createSSLContext ssl-util)))
+
 (defn- create-ssl-factory
   "Returns a SSLSocketFactory object"
   [{:keys [trust-store]}]
@@ -161,13 +171,21 @@
 
 (defn- create-connection
   "Create an LDAPConnection object"
-  [{:keys [host ssl?] :as options}]
+  [{:keys [host ssl? startTLS?]
+    :as options
+    :or {ssl? false startTLS? false}}]
   (let [h (host-as-map host)
+        host (:address h)
+        ldap-port (or (:port h) 389)
+        ldaps-port (or (:port h) 636)
         opt (connection-options options)]
-    (if ssl?
-      (let [ssl (create-ssl-factory options)]
-        (LDAPConnection. ssl opt (:address h) (or (:port h) 636)))
-      (LDAPConnection. opt (:address h) (or (:port h) 389)))))
+    (cond
+      ssl? (let [ssl (create-ssl-factory options)]
+             (LDAPConnection. ssl opt host ldaps-port))
+      startTLS? (let [conn (LDAPConnection. opt host ldap-port)]
+                  (.processExtendedOperation conn (create-ssl-context options))
+                  conn)
+      :else (LDAPConnection. opt host ldap-port))))
 
 (defn- bind-request
   "Returns a BindRequest object"
@@ -178,17 +196,23 @@
 
 (defn- connect-to-host
   "Connect to a single host"
-  [options]
-  (let [{:keys [num-connections]} options
-        connection (create-connection options)
-        bind-result (.bind connection (bind-request options))]
+  [{:keys [num-connections startTLS?]
+    :as options
+    :or {num-connections 1 startTLS? false}}]
+  (let [connection (create-connection options)
+        bind-result (.bind connection (bind-request options))
+        pcp (if startTLS?
+              (StartTLSPostConnectProcessor. (create-ssl-context options))
+              nil)]
     (if (= ResultCode/SUCCESS (.getResultCode bind-result))
-      (LDAPConnectionPool. connection (or num-connections 1))
+      (LDAPConnectionPool. connection num-connections num-connections pcp)
       (throw (LDAPException. bind-result)))))
 
 (defn- create-server-set
   "Returns a RoundRobinServerSet"
-  [{:keys [host ssl?] :as options}]
+  [{:keys [host ssl? startTLS?]
+    :as options
+    :or {ssl? false startTLS? false}}]
   (let [hosts (map host-as-map host)
         addresses (into-array (map :address hosts))
         opt (connection-options options)]
@@ -201,11 +225,16 @@
 
 (defn- connect-to-hosts
   "Connects to multiple hosts"
-  [options]
-  (let [{:keys [num-connections]} options
-        server-set (create-server-set options)
-        bind-request (bind-request options)]
-    (LDAPConnectionPool. server-set bind-request (or num-connections 1))))
+  [{:keys [num-connections startTLS?]
+    :as options
+    :or {num-connections 1 startTLS? false}}]
+  (let [server-set (create-server-set options)
+        bind-request (bind-request options)
+        pcp (if startTLS?
+              (StartTLSPostConnectProcessor. (create-ssl-context options))
+              nil)]
+    (LDAPConnectionPool. server-set bind-request num-connections
+                         num-connections pcp)))
 
 
 (defn- set-entry-kv!
@@ -439,6 +468,7 @@
    :password        The password to bind with, optional
    :num-connections The number of connections in the pool, defaults to 1
    :ssl?            Boolean, connect over SSL (ldaps), defaults to false
+   :startTLS?       Boolean, use startTLS over non-SSL port, defaults to false
    :trust-store     Only trust SSL certificates that are in this
                     JKS format file, optional, defaults to trusting all
                     certificates

@@ -43,6 +43,7 @@ Options is a map with the following entries:
     :password        The password to bind with, optional
     :num-connections The number of connections in the pool, defaults to 1
     :ssl?            Boolean, connect over SSL (ldaps), defaults to false
+    :startTLS?       Boolean, use startTLS over non-SSL port, defaults to false
     :trust-store     Only trust SSL certificates that are in this
                      JKS format file, optional, defaults to trusting all
                      certificates
