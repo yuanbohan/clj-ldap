@@ -147,14 +147,20 @@
          success*))
   (is (= (:changeNumber (ldap/get *conn* (str "changeNumber=1234," base*)))
          "1234"))
-  (is (= (ldap/delete *conn* (str "changeNumber=1234," base*))
-         success*)))
+  (is (= (ldap/delete *conn* (str "changeNumber=1234," base*)
+                      {:pre-read [:objectClass]})
+         {:code 0, :name "success",
+          :pre-read {:objectClass #{"top" "changeLogEntry"}}})))
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)
                       {:add {:objectClass "organizationalPerson"
-                             :l "Hollywood"}})
-         success*))
+                             :l "Hollywood"}
+                       :pre-read #{:objectClass :l :cn}
+                       :post-read #{:l :cn}})
+         {:code 0, :name "success",
+          :pre-read {:objectClass #{"top" "person"}, :cn "testa"},
+          :post-read {:l "Hollywood", :cn "testa"}}))
   (is (= (ldap/modify
           *conn* (:dn person-b*)
           {:add {:telephoneNumber ["0000000005" "0000000006"]}})
