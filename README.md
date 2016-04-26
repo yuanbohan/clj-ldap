@@ -54,15 +54,15 @@ Options is a map with the following entries:
 Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
 Some examples:
 ```clojure
-    (ldap/connect conn {:host "ldap.example.com" :num-connections 10})
+    (ldap/connect {:host "ldap.example.com" :num-connections 10})
     
-    (ldap/connect conn {:host [{:address "ldap1.example.com" :port 1389}
-                               {:address "ldap3.example.com"}
-                               "ldap2.example.com:1389"]
-                        :ssl? true
-                        :num-connections 9})
+    (ldap/connect {:host [{:address "ldap1.example.com" :port 1389}
+                          {:address "ldap3.example.com"}
+                          "ldap2.example.com:1389"]
+                   :startTLS? true
+                   :num-connections 9})
                         
-    (ldap/connect conn {:host {:port 1389}})
+    (ldap/connect {:host {:port 1389}})
 ```
 
 ## bind? [connection bind-dn password] [connection-pool bind-dn password]
@@ -150,7 +150,7 @@ The values of the attributes given in :pre-read and :post-read are available in 
                   {:increment {:uidNumber 1}
                    :post-read #{:uidNumber}})
 ```
-     returns
+returns
 ```clojure
        {:code 0
         :name "success"
