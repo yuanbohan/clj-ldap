@@ -1,8 +1,8 @@
-(defproject org.clojars.pntblnk/clj-ldap "0.0.10"
+(defproject org.clojars.pntblnk/clj-ldap "0.0.11"
   :description "Clojure ldap client."
   :url "https://github.com/pauldorman/clj-ldap"
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [com.unboundid/unboundid-ldapsdk "3.1.0"]]
+                 [com.unboundid/unboundid-ldapsdk "3.1.1"]]
   :profiles {:test {:dependencies [[lein-clojars "0.9.1"]]}}
   :aot [clj-ldap.client]
   :license {:name "Eclipse Public License - v 1.0"

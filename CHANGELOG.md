@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.0.11]
+This release addresses a bug introduced in 0.0.10 and bumps the ldap-sdk version to 3.1.1.
+- Fix bug preventing use of :pre-read and :post-read options to modify and delete
+- Introduce test coverage of :pre-read and :post-read
+
 ## [0.0.10]
 ### Binary (byte-array) attribute values
 The behavior of the api towards binary valued attributes has been fixed. Thanks to Ray Miller for providing the 
