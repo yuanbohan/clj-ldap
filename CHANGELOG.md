@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.0.12]
+This release adds the following:
+- The :proxied-auth option to most functions
+- The compare? function which invokes LDAP compare operation
+- 
 ## [0.0.11]
 This release addresses a bug introduced in 0.0.10 and bumps the ldap-sdk version to 3.1.1.
 - Fix bug preventing use of :pre-read and :post-read options to modify and delete
