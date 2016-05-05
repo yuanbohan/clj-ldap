@@ -3,7 +3,7 @@
 
 clj-ldap is a thin layer on the [unboundid sdk](http://www.unboundid.com/products/ldap-sdk/) and allows clojure programs to talk to ldap servers. This library is available on [clojars.org](http://clojars.org/search?q=clj-ldap)
 ```clojure
-     :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.11"]]
+     :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.12"]]
 ```
 # Example 
 
@@ -110,6 +110,16 @@ Adds an entry to the connected ldap server. The entry is map of keywords to valu
 ```
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if there is an error with the request or the add failed.
 
+## compare? [connection dn attribute assertion-value]
+
+Determines if the specified entry contains the given attribute and value.
+
+```clojure
+    (ldap/compare? conn "cn=dude,ou=people,dc=example,dc=com"
+                   :description "His dudeness")
+```
+Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if there is an error with the request or the add failed.
+
 ## modify [connection dn modifications]                    
 
 Modifies an entry in the connected ldap server. The modifications are
@@ -142,7 +152,8 @@ All the keys in the map are optional e.g:
 The values in the map can also be set to :all when doing a delete e.g:
 ```clojure
      (ldap/modify conn "cn=dude,ou=people,dc=example,dc=com"
-                  {:delete {:telephoneNumber :all}})
+                  {:delete {:telephoneNumber :all}}
+                  {:proxied-auth "dn:cn=app,dc=example,dc=com"})
 ```
 The values of the attributes given in :pre-read and :post-read are available in the returned map and are part of an atomic ldap operation e.g
 ```clojure
@@ -186,6 +197,8 @@ Options is a map with the following optional entries:
                    :sort-keys [ :cn :ascending
                                 :employeNumber :descending ... ] }
                  At least one sort key must be provided.
+    :proxied-auth    The dn:<dn> or u:<uid> to be used as the authorization
+                     identity when processing the request. Don't forget the dn:/u: prefix.
     :controls    Adds the provided controls for this request.
     :respf       Applies this function to the list of response controls present.
 
@@ -193,7 +206,8 @@ e.g
 ```clojure
     (ldap/search conn "ou=people,dc=example,dc=com")
     
-    (ldap/search conn "ou=people,dc=example,dc=com" {:attributes [:cn] :sizelimit 100})
+    (ldap/search conn "ou=people,dc=example,dc=com" {:attributes [:cn] :sizelimit 100
+                                                     :proxied-auth "dn:cn=app,dc=example,dc=com"})
 
     (ldap/search conn "dc=example,dc=com" {:filter "(uid=abc123)" :attributes [:cn :uid :userCertificate]
                                            :byte-valued [:userCertificate]})
