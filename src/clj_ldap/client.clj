@@ -106,11 +106,11 @@
   [m control]
   (condp instance? control
     PreReadResponseControl
-    (update-in m [:pre-read] merge ((entry-as-map [])
-                                     (.getEntry control) false))
+    (update-in m [:pre-read] merge ((entry-as-map [] false)
+                                     (.getEntry control)))
     PostReadResponseControl
-    (update-in m [:post-read] merge ((entry-as-map [])
-                                      (.getEntry control) false))
+    (update-in m [:post-read] merge ((entry-as-map [] false)
+                                      (.getEntry control)))
     m))
 
 (defn- add-response-controls
