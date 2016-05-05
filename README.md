@@ -118,7 +118,7 @@ Determines if the specified entry contains the given attribute and value.
     (ldap/compare? conn "cn=dude,ou=people,dc=example,dc=com"
                    :description "His dudeness")
 ```
-Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if there is an error with the request or the add failed.
+Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if there is an error with the request or the LDAP compare failed.
 
 ## modify [connection dn modifications]                    
 
