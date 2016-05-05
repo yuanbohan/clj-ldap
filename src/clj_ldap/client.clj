@@ -26,7 +26,9 @@
             DereferencePolicy
             LDAPSearchException
             Control
-            StartTLSPostConnectProcessor])
+            StartTLSPostConnectProcessor
+            CompareRequest
+            CompareResult])
   (:import [com.unboundid.ldap.sdk.extensions
             PasswordModifyExtendedRequest
             PasswordModifyExtendedResult
@@ -37,6 +39,7 @@
             PostReadRequestControl
             PreReadResponseControl
             PostReadResponseControl
+            ProxiedAuthorizationV2RequestControl
             SimplePagedResultsControl
             ServerSideSortRequestControl
             SortKey])
@@ -288,7 +291,10 @@
   (when (contains? options :post-read)
     (let [attributes (map name (options :post-read))
           pre-read-control (PostReadRequestControl. (into-array attributes))]
-      (.addControl request pre-read-control))))
+      (.addControl request pre-read-control)))
+  (when (contains? options :proxied-auth)
+    (.addControl request (ProxiedAuthorizationV2RequestControl.
+                           (:proxied-auth options)))))
 
 (defn- get-modify-request
   "Sets up a ModifyRequest object using the contents of the given map"
@@ -438,20 +444,26 @@
   "Given a map of search criteria and possibly other keys, return the same map
    with search criteria keys rewritten ready for passing to search functions."
   [base {:keys [scope filter attributes size-limit time-limit types-only
-                controls respf server-sort byte-valued]
+                proxied-auth controls respf server-sort byte-valued]
          :as original
          :or {size-limit 0 time-limit 0 types-only false byte-valued []
-              filter "(objectclass=*)" controls [] respf nil server-sort nil}}]
-  (merge original {:base       base
-                   :scope      (get-scope scope)
-                   :filter     filter
-                   :attributes (get-attributes attributes)
-                   :size-limit  size-limit :time-limit time-limit
-                   :types-only types-only
-                   :controls   (if (not-nil? server-sort)
-                                 (cons (createServerSideSort server-sort)
-                                       controls)
-                                 controls)}))
+              filter "(objectclass=*)" controls [] respf nil
+              proxied-auth nil server-sort nil}}]
+  (let [server-sort-control (if (not-nil? server-sort)
+                              [(createServerSideSort server-sort)]
+                              [])
+        proxied-auth-control (if (not-nil? proxied-auth)
+                           [(ProxiedAuthorizationV2RequestControl. proxied-auth)]
+                           [])]
+    (merge original {:base       base
+                     :scope      (get-scope scope)
+                     :filter     filter
+                     :attributes (get-attributes attributes)
+                     :size-limit size-limit :time-limit time-limit
+                     :types-only types-only
+                     :controls   (-> controls
+                                     (into server-sort-control)
+                                     (into proxied-auth-control))})))
 
 ;;=========== API ==============================================================
 
@@ -536,12 +548,28 @@ underlying connections unchanged."
 
 (defn add
   "Adds an entry to the connected ldap server. The entry is assumed to be
-   a map."
-  [connection dn entry]
-  (let [entry-obj (Entry. dn)]
-    (set-entry-map! entry-obj entry)
-    (ldap-result
-     (.add connection entry-obj))))
+   a map. The options map supports control :proxied-auth."
+  ([connection dn entry]
+    (add connection dn entry nil))
+  ([connection dn entry options]
+   (let [entry-obj (Entry. dn)]
+     (set-entry-map! entry-obj entry)
+     (when options
+       (add-request-controls entry-obj options))
+     (ldap-result
+       (.add connection entry-obj)))))
+
+(defn compare?
+  "Determine whether the specified entry contains a given attribute value.
+   The options map supports control :proxied-auth."
+  ([connection dn attribute assertion-value]
+   (compare? connection dn attribute assertion-value nil))
+  ([connection dn attribute assertion-value options]
+   (let [request (CompareRequest. dn (name attribute) assertion-value)]
+     (when (and options (:proxied-auth options))
+       (.addControl request (ProxiedAuthorizationV2RequestControl.
+                              (:proxied-auth options))))
+     (.compareMatched (.compare connection request)))))
 
 (defn modify
   "Modifies an entry in the connected ldap server. The modifications are
@@ -567,10 +595,14 @@ Where :add adds an attribute value, :delete deletes an attribute value and
 :replace replaces the set of values for the attribute with the ones specified.
 The entries :pre-read and :post-read specify attributes that have be read and
 returned either before or after the modifications have taken place."
-  [connection dn modifications]
-  (let [modify-obj (get-modify-request dn modifications)]
-    (ldap-result
-     (.modify connection modify-obj))))
+  ([connection dn modifications]
+    (modify connection dn modifications nil))
+  ([connection dn modifications options]
+   (let [modify-obj (get-modify-request dn modifications)]
+     (when options
+       (add-request-controls modify-obj options))
+     (ldap-result
+       (.modify connection modify-obj)))))
 
 (defn modify-password
   "Creates a new password modify extended request that will attempt to change
@@ -594,16 +626,23 @@ returned either before or after the modifications have taken place."
 
   The new-rdn has the form cn=foo or ou=foo. Using just foo is not sufficient.
   The delete-old-rdn boolean option indicates whether to delete the current
-  RDN value from the target entry."
-  [connection dn new-rdn delete-old-rdn]
-  (let [request (ModifyDNRequest. dn new-rdn delete-old-rdn)]
-    (ldap-result
-      (.modifyDN connection request))))
+  RDN value from the target entry. The options map supports pre/post-read
+  and proxied-auth controls."
+  ([connection dn new-rdn delete-old-rdn]
+    (modify-rdn connection dn new-rdn delete-old-rdn nil))
+  ([connection dn new-rdn delete-old-rdn options]
+   (let [request (ModifyDNRequest. dn new-rdn delete-old-rdn)]
+     (when options
+       (add-request-controls request options))
+     (ldap-result
+       (.modifyDN connection request)))))
 
 (defn delete
   "Deletes the given entry in the connected ldap server. Optionally takes
-   a map that can contain the entry :pre-read to indicate the attributes
-   that should be read before deletion."
+   a map that can contain:
+      :pre-read     Indicates the attributes that should be read before deletion
+      :proxied-auth The dn:<dn> or u:<uid> to be used as the authorization
+                    identity when processing the request."
   ([connection dn]
      (delete connection dn nil))
   ([connection dn options]
@@ -633,6 +672,8 @@ returned either before or after the modifications have taken place."
 ;;                   :sort-keys [ :cn :ascending
 ;;                                :employeNumber :descending ... ]
 ;;                 At least one sort key must be provided.
+;;    :proxied-auth    The dn:<dn> or u:<uid> to be used as the authorization
+;;                     identity when processing the request.
 ;;    :controls    Adds the provided controls for this request.
 ;;    :respf       Applies this function to all response controls present.
 

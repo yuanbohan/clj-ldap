@@ -207,7 +207,8 @@
     (is (= (ldap/modify *conn* (:dn person-a*)
                         {:add {:objectclass ["inetOrgPerson"
                                              "organizationalPerson"]
-                               :userCertificate certificate-data}})
+                               :userCertificate certificate-data}}
+                        {:proxied-auth (str "dn:" (:dn person-a*))})
            success*))
     (is (= (seq (:userCertificate
                   (first (ldap/search *conn* (:dn person-a*)
@@ -245,7 +246,9 @@
          (set [nil "testa" "testb" "Saul Hazledine"])))
   (is (= (set (map :cn
                    (ldap/search *conn* base*
-                                {:attributes [:cn] :filter "cn=test*"})))
+                                {:attributes [:cn]
+                                 :filter     "cn=test*"
+                                 :proxied-auth  (str "dn:" (:dn person-a*))})))
          (set ["testa" "testb"])))
   (is (= (map :cn
               (ldap/search *conn* base*
@@ -276,3 +279,12 @@
     (is (= *side-effects*
            (set [{:cn "testa" :sn "a"}
                  {:cn "testb" :sn "b"}])))))
+
+(deftest test-compare?
+  (is (= (ldap/compare? *conn* (:dn person-b*)
+                        :description "István Orosz")
+         true))
+  (is (= (ldap/compare? *conn* (:dn person-a*)
+                        :description "István Orosz"
+                        {:proxied-auth (str "dn:" (:dn person-b*))})
+         false)))
