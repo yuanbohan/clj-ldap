@@ -504,6 +504,11 @@ underlying connections unchanged."
       (= ResultCode/SUCCESS (.getResultCode r)))
     (catch Exception _ false)))
 
+(defn close
+  "closes the supplied connection or pool object"
+  [conn]
+  (.close conn))
+
 (defn who-am-i
   "Return the authorization identity associated with this connection."
   [connection]
