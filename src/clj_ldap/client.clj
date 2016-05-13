@@ -484,6 +484,11 @@
       (connect-to-hosts options)
       (connect-to-host options))))
 
+(defn get-connection
+  "returns a connection from the LDAPConnectionPool object"
+  [pool]
+  (.getConnection pool))
+
 (defn bind?
   "Performs a bind operation using the provided connection, bindDN and
 password. Returns true if successful.
