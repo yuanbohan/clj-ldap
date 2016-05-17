@@ -86,7 +86,7 @@ Usage:
           user-password "password"]
       (try
         (ldap/bind? conn user-dn user-password)
-        (ldap/modify conn user-dn {:replace {:descriptionnot "On sabatical"}})
+        (ldap/modify conn user-dn {:replace {:description "On sabatical"}})
         (finally (ldap/release-connection pool conn))))
 ```
 Performs a bind operation using the provided connection, bindDN and
