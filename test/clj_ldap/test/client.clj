@@ -147,14 +147,20 @@
          success*))
   (is (= (:changeNumber (ldap/get *conn* (str "changeNumber=1234," base*)))
          "1234"))
-  (is (= (ldap/delete *conn* (str "changeNumber=1234," base*))
-         success*)))
+  (is (= (ldap/delete *conn* (str "changeNumber=1234," base*)
+                      {:pre-read [:objectClass]})
+         {:code 0, :name "success",
+          :pre-read {:objectClass #{"top" "changeLogEntry"}}})))
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)
                       {:add {:objectClass "organizationalPerson"
-                             :l "Hollywood"}})
-         success*))
+                             :l "Hollywood"}
+                       :pre-read #{:objectClass :l :cn}
+                       :post-read #{:l :cn}})
+         {:code 0, :name "success",
+          :pre-read {:objectClass #{"top" "person"}, :cn "testa"},
+          :post-read {:l "Hollywood", :cn "testa"}}))
   (is (= (ldap/modify
           *conn* (:dn person-b*)
           {:add {:telephoneNumber ["0000000005" "0000000006"]}})
@@ -201,7 +207,8 @@
     (is (= (ldap/modify *conn* (:dn person-a*)
                         {:add {:objectclass ["inetOrgPerson"
                                              "organizationalPerson"]
-                               :userCertificate certificate-data}})
+                               :userCertificate certificate-data}}
+                        {:proxied-auth (str "dn:" (:dn person-a*))})
            success*))
     (is (= (seq (:userCertificate
                   (first (ldap/search *conn* (:dn person-a*)
@@ -239,7 +246,9 @@
          (set [nil "testa" "testb" "Saul Hazledine"])))
   (is (= (set (map :cn
                    (ldap/search *conn* base*
-                                {:attributes [:cn] :filter "cn=test*"})))
+                                {:attributes [:cn]
+                                 :filter     "cn=test*"
+                                 :proxied-auth  (str "dn:" (:dn person-a*))})))
          (set ["testa" "testb"])))
   (is (= (map :cn
               (ldap/search *conn* base*
@@ -270,3 +279,12 @@
     (is (= *side-effects*
            (set [{:cn "testa" :sn "a"}
                  {:cn "testb" :sn "b"}])))))
+
+(deftest test-compare?
+  (is (= (ldap/compare? *conn* (:dn person-b*)
+                        :description "István Orosz")
+         true))
+  (is (= (ldap/compare? *conn* (:dn person-a*)
+                        :description "István Orosz"
+                        {:proxied-auth (str "dn:" (:dn person-b*))})
+         false)))
