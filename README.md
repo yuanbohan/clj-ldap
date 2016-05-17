@@ -84,9 +84,10 @@ Usage:
     (let [conn (ldap/get-connection pool)
           user-dn "uid=user.1,ou=people,dc=example,dc=com"
           user-password "password"]
-      (ldap/bind? conn user-dn user-password)
-      (ldap/modify conn user-dn {:replace {:description "On sabatical"}})
-      (ldap/release-connection pool conn))
+      (try
+        (ldap/bind? conn user-dn user-password)
+        (ldap/modify conn user-dn {:replace {:descriptionnot "On sabatical"}})
+        (finally (ldap/release-connection pool conn))))
 ```
 Performs a bind operation using the provided connection, bindDN and
 password. Returns true if successful.
