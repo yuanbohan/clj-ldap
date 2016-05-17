@@ -54,34 +54,51 @@ Options is a map with the following entries:
 Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
 Some examples:
 ```clojure
-    (ldap/connect {:host "ldap.example.com" :num-connections 10})
+    (ldap/connect {:host "ldap.example.com" :num-connections 10
+                   :bind-dn "cn=admin,dc=example,dc=com"
+                   :password "password"})
     
     (ldap/connect {:host [{:address "ldap1.example.com" :port 1389}
                           {:address "ldap3.example.com"}
                           "ldap2.example.com:1389"]
                    :startTLS? true
-                   :num-connections 9})
+                   :num-connections 9
+                   :bind-dn "cn=directory manager"
+                   :password "password"})
                         
-    (ldap/connect {:host {:port 1389}})
+    (ldap/connect {:host {:port 1389}
+                   :bind-dn "cn=admin,dc=example,dc=com"
+                   :password "password"})
 ```
+The pool can then be used as a parameter to all the functions in the library where
+a connection is expected. Using a pool in this manner aleviates the caller from having to get and
+release connections. It will still be necessary to get and release a connection if a single
+connection is needed to process a sequence of operations. See the following bind? example.
 
 ## bind? [connection bind-dn password] [connection-pool bind-dn password]
 
 Usage:
 ```clojure
-    (ldap/bind? conn "cn=dude,ou=people,dc=example,dc=com" "somepass")
+    (ldap/bind? pool "cn=dude,ou=people,dc=example,dc=com" "somepass")
+
+    (let [conn (ldap/get-connection pool)
+          user-dn "uid=user.1,ou=people,dc=example,dc=com"
+          user-password "password"]
+      (ldap/bind? conn user-dn user-password)
+      (ldap/modify conn user-dn {:replace {:description "On sabatical"}})
+      (ldap/release-connection pool conn))
 ```
 Performs a bind operation using the provided connection, bindDN and
 password. Returns true if successful.
+
+If an LDAPConnectionPool object is passed as the connection argument
+the bind attempt will have no side-effects, leaving the state of the
+underlying connections unchanged.
 
 When an LDAP connection object is used as the connection argument the
 bind? function will attempt to change the identity of that connection
 to that of the provided DN. Subsequent operations on that connection
 will be done using the bound identity.
-
-If an LDAP connection pool object is passed as the connection argument
-the bind attempt will have no side-effects, leaving the state of the
-underlying connections unchanged.
 
 ## get [connection dn] [connection dn attributes]
   

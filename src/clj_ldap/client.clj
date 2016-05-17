@@ -497,9 +497,18 @@
       (connect-to-host options))))
 
 (defn get-connection
-  "returns a connection from the LDAPConnectionPool object"
+  "Returns a connection from the LDAPConnectionPool object. This approach is
+   only needed when a sequence of operations must be performed on a single
+   connection. For example: get-connection, bind?, modify (as the bound user).
+   The connection should be released back to the pool after use."
   [pool]
   (.getConnection pool))
+
+(defn release-connection
+  "Returns the original connection pool with the provided connection released
+   and reauthenticated."
+  [pool connection]
+  (.releaseAndReAuthenticateConnection pool connection))
 
 (defn bind?
   "Performs a bind operation using the provided connection, bindDN and
