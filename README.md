@@ -85,8 +85,8 @@ Usage:
           user-dn "uid=user.1,ou=people,dc=example,dc=com"
           user-password "password"]
       (try
-        (ldap/bind? conn user-dn user-password)
-        (ldap/modify conn user-dn {:replace {:description "On sabatical"}})
+        (when (ldap/bind? conn user-dn user-password)
+          (ldap/modify conn user-dn {:replace {:description "On sabatical"}}))
         (finally (ldap/release-connection pool conn))))
 ```
 Performs a bind operation using the provided connection, bindDN and
