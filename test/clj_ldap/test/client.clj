@@ -123,11 +123,11 @@
   (if (> (-> *conn*
              (.getConnectionPoolStatistics)
              (.getMaximumAvailableConnections)) 1)
-    (binding [*c* (.getConnection *conn*)]
+    (binding [*c* (ldap/get-connection *conn*)]
       (let [before (ldap/who-am-i *c*)
             _ (ldap/bind? *c* (:dn person-a*) "passa")
             a (ldap/who-am-i *c*)
-            _ (.releaseAndReAuthenticateConnection *conn* *c*)]
+            _ (ldap/release-connection *conn* *c*)]
         (is (= [before a])
            ["" (:dn person-a*)])))))
 
