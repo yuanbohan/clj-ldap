@@ -11,7 +11,8 @@
 (def ^:dynamic *c* nil)
 
 ;; Tests concentrate on a single object class
-(def base* "ou=people,dc=alienscience,dc=org,dc=uk")
+(def toplevel* "dc=alienscience,dc=org,dc=uk")
+(def base* (str "ou=people," toplevel*))
 (def dn*  (str "cn=%s," base*))
 (def object-class* #{"top" "person"})
 
@@ -80,8 +81,8 @@
    (ldap/connect {:host [(str "localhost:" ssl-port)
                          {:port ssl-port}]
                   :ssl? true
-                  :num-connections 5})  
-   ])
+                  :num-connections 5})])
+
 
 (defn- test-server
   "Setup server"
@@ -91,19 +92,35 @@
     (f))
   (server/stop!))
 
+(defn- add-toplevel-objects!
+  "Adds top level entries, needed for testing, to the ldap server"
+  [connection]
+  (ldap/add connection "dc=alienscience,dc=org,dc=uk"
+            {:objectClass ["top" "domain" "extensibleObject"]
+             :dc "alienscience"})
+  (ldap/add connection "ou=people,dc=alienscience,dc=org,dc=uk"
+            {:objectClass ["top" "organizationalUnit"]
+             :ou "people"})
+  (ldap/add connection
+            "cn=Saul Hazledine,ou=people,dc=alienscience,dc=org,dc=uk"
+            {:objectClass ["top" "Person"]
+             :cn "Saul Hazledine"
+             :sn "Hazledine"
+             :description "Creator of bugs"}))
+
 (defn- test-data
   "Provide test data"
   [f]
   (doseq [connection *connections*]
     (binding [*conn* connection]
       (try
+        (add-toplevel-objects! *conn*)
         (ldap/add *conn* (:dn person-a*) (:object person-a*))
         (ldap/add *conn* (:dn person-b*) (:object person-b*))
         (catch Exception e))
       (f)
       (try
-        (ldap/delete *conn* (:dn person-a*))
-        (ldap/delete *conn* (:dn person-b*))
+        (ldap/delete *conn* toplevel* {:recursive true})
         (catch Exception e)))))
 
 (use-fixtures :each test-data)
@@ -151,6 +168,12 @@
                       {:pre-read [:objectClass]})
          {:code 0, :name "success",
           :pre-read {:objectClass #{"top" "changeLogEntry"}}})))
+
+(deftest test-recursive-delete
+  (is (= (ldap/add *conn* (:dn person-c*) (:object person-c*))
+         success*))
+  (is (= (ldap/delete *conn* base* {:recursive true})
+         success*)))
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)

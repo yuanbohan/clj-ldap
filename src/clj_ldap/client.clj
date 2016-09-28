@@ -42,7 +42,8 @@
             ProxiedAuthorizationV2RequestControl
             SimplePagedResultsControl
             ServerSideSortRequestControl
-            SortKey])
+            SortKey
+            SubtreeDeleteRequestControl])
   (:import [com.unboundid.util
             Base64])
   (:import [com.unboundid.util.ssl
@@ -294,7 +295,9 @@
       (.addControl request pre-read-control)))
   (when (contains? options :proxied-auth)
     (.addControl request (ProxiedAuthorizationV2RequestControl.
-                           (:proxied-auth options)))))
+                           (:proxied-auth options))))
+  (when (and (contains? options :recursive) (= (type request) DeleteRequest))
+    (.addControl request (SubtreeDeleteRequestControl.))))
 
 (defn- get-modify-request
   "Sets up a ModifyRequest object using the contents of the given map"
@@ -661,15 +664,16 @@ returned either before or after the modifications have taken place."
    a map that can contain:
       :pre-read     Indicates the attributes that should be read before deletion
       :proxied-auth The dn:<dn> or u:<uid> to be used as the authorization
-                    identity when processing the request."
+                    identity when processing the request.
+      :recursive    Whether or not to recursively delete the subtree"
   ([connection dn]
-     (delete connection dn nil))
+   (delete connection dn nil))
   ([connection dn options]
-     (let [delete-obj (DeleteRequest. dn)]
-       (when options
-         (add-request-controls delete-obj options))
-       (ldap-result
-        (.delete connection delete-obj)))))
+   (let [delete-obj (DeleteRequest. dn)]
+     (when options
+       (add-request-controls delete-obj options))
+     (ldap-result
+      (.delete connection delete-obj)))))
 
 ;; For the following search functions.
 ;; Options is a map with the following optional entries:
