@@ -120,7 +120,7 @@
         (catch Exception e))
       (f)
       (try
-        (ldap/delete *conn* toplevel* {:recursive true})
+        (ldap/delete *conn* toplevel* {:delete-subtree true})
         (catch Exception e)))))
 
 (use-fixtures :each test-data)
@@ -169,11 +169,12 @@
          {:code 0, :name "success",
           :pre-read {:objectClass #{"top" "changeLogEntry"}}})))
 
-(deftest test-recursive-delete
+(deftest test-delete-subtree
   (is (= (ldap/add *conn* (:dn person-c*) (:object person-c*))
          success*))
-  (is (= (ldap/delete *conn* base* {:recursive true})
-         success*)))
+  (is (= (ldap/delete *conn* base* {:delete-subtree true})
+         success*))
+  (is (nil? (ldap/get *conn* base*))))
 
 (deftest test-modify-add
   (is (= (ldap/modify *conn* (:dn person-a*)

@@ -296,7 +296,7 @@
   (when (contains? options :proxied-auth)
     (.addControl request (ProxiedAuthorizationV2RequestControl.
                            (:proxied-auth options))))
-  (when (and (contains? options :recursive) (= (type request) DeleteRequest))
+  (when (and (contains? options :delete-subtree) (= (type request) DeleteRequest))
     (.addControl request (SubtreeDeleteRequestControl.))))
 
 (defn- get-modify-request
@@ -662,10 +662,12 @@ returned either before or after the modifications have taken place."
 (defn delete
   "Deletes the given entry in the connected ldap server. Optionally takes
    a map that can contain:
-      :pre-read     Indicates the attributes that should be read before deletion
-      :proxied-auth The dn:<dn> or u:<uid> to be used as the authorization
-                    identity when processing the request.
-      :recursive    Whether or not to recursively delete the subtree"
+      :pre-read        Indicates the attributes that should be read before
+                       deletion
+      :proxied-auth    The dn:<dn> or u:<uid> to be used as the authorization
+                       identity when processing the request.
+      :delete-subtree  If truthy, deletes the entire subtree of DN (server must
+                       support Subtree Delete Control, 1.2.840.113556.1.4.805)"
   ([connection dn]
    (delete connection dn nil))
   ([connection dn options]
