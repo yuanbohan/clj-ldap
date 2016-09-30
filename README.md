@@ -3,7 +3,7 @@
 
 clj-ldap is a thin layer on the [unboundid sdk](http://www.unboundid.com/products/ldap-sdk/) and allows clojure programs to talk to ldap servers. This library is available on [clojars.org](http://clojars.org/search?q=clj-ldap)
 ```clojure
-     :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.12"]]
+     :dependencies [[org.clojars.pntblnk/clj-ldap "0.0.13"]]
 ```
 # Example 
 
@@ -251,11 +251,18 @@ Throws a [LDAPSearchException](http://www.unboundid.com/products/ldap-sdk/docs/j
 
 ## delete [connection dn] [connection dn options]
 
-Deletes the given entry in the connected ldap server. Optionally takes a map that can contain the entry :pre-read to indicate the attributes that should be read before deletion.
+Deletes the given entry in the connected ldap server.
+
+Options is a map with the following optional entries:
+
+    :delete-subtree  Use the Subtree Delete Control to delete entire subtree rooted at dn.
+    :pre-read        A set of attributes that should be read before deletion (will only apply to base entry if used with :delete-subtree).
+    :proxied-auth    The dn:<dn> or u:<uid> to be used as the authorization
+                     identity when processing the request. Don't forget the dn:/u: prefix.
 ```clojure
      (ldap/delete conn "cn=dude,ou=people,dc=example,dc=com")
 
      (ldap/delete conn "cn=dude,ou=people,dc=example,dc=com" 
-                       {:pre-read #{"telephoneNumber"}})
+                       {:pre-read #{:telephoneNumber}})
 ```
 Throws a [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if the object does not exist or an error occurs.

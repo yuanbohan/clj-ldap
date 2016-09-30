@@ -95,14 +95,14 @@
 (defn- add-toplevel-objects!
   "Adds top level entries, needed for testing, to the ldap server"
   [connection]
-  (ldap/add connection "dc=alienscience,dc=org,dc=uk"
+  (ldap/add connection toplevel*
             {:objectClass ["top" "domain" "extensibleObject"]
              :dc "alienscience"})
-  (ldap/add connection "ou=people,dc=alienscience,dc=org,dc=uk"
+  (ldap/add connection base*
             {:objectClass ["top" "organizationalUnit"]
              :ou "people"})
   (ldap/add connection
-            "cn=Saul Hazledine,ou=people,dc=alienscience,dc=org,dc=uk"
+            (str "cn=Saul Hazledine," base*)
             {:objectClass ["top" "Person"]
              :cn "Saul Hazledine"
              :sn "Hazledine"
