@@ -662,8 +662,8 @@ returned either before or after the modifications have taken place."
 (defn delete
   "Deletes the given entry in the connected ldap server. Optionally takes
    a map that can contain:
-      :pre-read        Indicates the attributes that should be read before
-                       deletion
+      :pre-read        A set of attributes that should be read before deletion
+                       (only applied to base entry if used with :delete-subtree)
       :proxied-auth    The dn:<dn> or u:<uid> to be used as the authorization
                        identity when processing the request.
       :delete-subtree  If truthy, deletes the entire subtree of DN (server must
