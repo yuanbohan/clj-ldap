@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.0.13]
+This release adds the following:
+- The :delete-subtree option to the delete function, which requires the support of the Subtree Delete Request Control on the server
+
 ## [0.0.12]
 This release adds the following:
 - The :proxied-auth option to most functions
