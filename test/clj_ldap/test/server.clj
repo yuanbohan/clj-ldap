@@ -50,22 +50,6 @@
     (.startListening ds)
     ds))
 
-(defn- add-toplevel-objects!
-  "Adds top level entries, needed for testing, to the ldap server"
-  [connection]
-  (ldap/add connection "dc=alienscience,dc=org,dc=uk"
-            {:objectClass ["top" "domain" "extensibleObject"]
-             :dc "alienscience"})
-  (ldap/add connection "ou=people,dc=alienscience,dc=org,dc=uk"
-            {:objectClass ["top" "organizationalUnit"]
-             :ou "people"})
-  (ldap/add connection
-            "cn=Saul Hazledine,ou=people,dc=alienscience,dc=org,dc=uk"
-            {:objectClass ["top" "Person"]
-             :cn "Saul Hazledine"
-             :sn "Hazledine"
-             :description "Creator of bugs"}))
-
 (defn stop!
   "Stops the embedded ldap server (listening on LDAP and LDAPS ports)"
   []
@@ -86,6 +70,4 @@
   "Starts an embedded ldap server on the given port and SSL"
   []
   (stop!)
-  (reset! server (start-ldap-server))
-  (let [conn (.getConnection @server)]
-    (add-toplevel-objects! conn)))
+  (reset! server (start-ldap-server)))
