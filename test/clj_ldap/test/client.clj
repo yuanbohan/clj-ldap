@@ -67,7 +67,8 @@
    (ldap/connect {:host {:port port}})
    (ldap/connect {:host {:address "localhost"
                          :port port}
-                  :num-connections 4})
+                  :num-connections 4
+                  :max-connections 4})
    (ldap/connect {:host (str "localhost:" port)})
    (ldap/connect {:ssl? true
                   :host {:port ssl-port}})
@@ -81,7 +82,8 @@
    (ldap/connect {:host [(str "localhost:" ssl-port)
                          {:port ssl-port}]
                   :ssl? true
-                  :num-connections 5})])
+                  :num-connections 5
+                  :max-connections 10})])
 
 
 (defn- test-server

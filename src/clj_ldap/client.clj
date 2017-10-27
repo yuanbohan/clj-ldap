@@ -200,16 +200,16 @@
 
 (defn- connect-to-host
   "Connect to a single host"
-  [{:keys [num-connections startTLS?]
+  [{:keys [num-connections max-connections startTLS?]
     :as options
-    :or {num-connections 1 startTLS? false}}]
+    :or {num-connections 1 max-connections 1 startTLS? false}}]
   (let [connection (create-connection options)
         bind-result (.bind connection (bind-request options))
         pcp (if startTLS?
               (StartTLSPostConnectProcessor. (create-ssl-context options))
               nil)]
     (if (= ResultCode/SUCCESS (.getResultCode bind-result))
-      (LDAPConnectionPool. connection num-connections num-connections pcp)
+      (LDAPConnectionPool. connection num-connections max-connections pcp)
       (throw (LDAPException. bind-result)))))
 
 (defn- create-server-set
@@ -229,16 +229,16 @@
 
 (defn- connect-to-hosts
   "Connects to multiple hosts"
-  [{:keys [num-connections startTLS?]
+  [{:keys [num-connections max-connections startTLS?]
     :as options
-    :or {num-connections 1 startTLS? false}}]
+    :or {num-connections 1 max-connections 1 startTLS? false}}]
   (let [server-set (create-server-set options)
         bind-request (bind-request options)
         pcp (if startTLS?
               (StartTLSPostConnectProcessor. (create-ssl-context options))
               nil)]
     (LDAPConnectionPool. server-set bind-request num-connections
-                         num-connections pcp)))
+                         max-connections pcp)))
 
 
 (defn- set-entry-kv!
@@ -481,7 +481,11 @@
                     balancing and failover. This entry is optional.
    :bind-dn         The DN to bind as, optional
    :password        The password to bind with, optional
-   :num-connections The number of connections in the pool, defaults to 1
+   :num-connections The number of connections to initially establish when
+                    the pool is created, defaults to 1
+   :max-connections The maximum number of connections that should be
+                    maintained in the pool. It must be greater than or
+                    equal to the initial number of connections, defaults to 1
    :ssl?            Boolean, connect over SSL (ldaps), defaults to false
    :startTLS?       Boolean, use startTLS over non-SSL port, defaults to false
    :trust-store     Only trust SSL certificates that are in this
