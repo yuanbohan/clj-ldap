@@ -198,20 +198,6 @@
     (SimpleBindRequest. bind-dn password)
     (SimpleBindRequest.)))
 
-(defn- connect-to-host
-  "Connect to a single host"
-  [{:keys [num-connections startTLS?]
-    :as options
-    :or {num-connections 1 startTLS? false}}]
-  (let [connection (create-connection options)
-        bind-result (.bind connection (bind-request options))
-        pcp (if startTLS?
-              (StartTLSPostConnectProcessor. (create-ssl-context options))
-              nil)]
-    (if (= ResultCode/SUCCESS (.getResultCode bind-result))
-      (LDAPConnectionPool. connection num-connections num-connections pcp)
-      (throw (LDAPException. bind-result)))))
-
 (defn- create-server-set
   "Returns a RoundRobinServerSet"
   [{:keys [host ssl? startTLS?]
@@ -227,18 +213,35 @@
       (let [ports (int-array (map #(or (:port %) (int 389)) hosts))]
         (RoundRobinServerSet. addresses ports opt)))))
 
+(defn- connect-to-host
+  "Connect to a single host"
+  [{:keys [num-connections initial-connections max-connections startTLS?]
+    :as options
+    :or {num-connections 1 startTLS? false}}]
+  (let [connection (create-connection options)
+        bind-result (.bind connection (bind-request options))
+        pcp (if startTLS?
+              (StartTLSPostConnectProcessor. (create-ssl-context options))
+              nil)
+        initial-connections (or initial-connections num-connections)
+        max-connections (or max-connections initial-connections)]
+    (if (= ResultCode/SUCCESS (.getResultCode bind-result))
+      (LDAPConnectionPool. connection initial-connections max-connections pcp)
+      (throw (LDAPException. bind-result)))))
+
 (defn- connect-to-hosts
   "Connects to multiple hosts"
-  [{:keys [num-connections startTLS?]
+  [{:keys [num-connections initial-connections max-connections startTLS?]
     :as options
     :or {num-connections 1 startTLS? false}}]
   (let [server-set (create-server-set options)
         bind-request (bind-request options)
-        pcp (if startTLS?
-              (StartTLSPostConnectProcessor. (create-ssl-context options))
-              nil)]
-    (LDAPConnectionPool. server-set bind-request num-connections
-                         num-connections pcp)))
+        pcp (when startTLS?
+              (StartTLSPostConnectProcessor. (create-ssl-context options)))
+        initial-connections (or initial-connections num-connections)
+        max-connections (or max-connections initial-connections)]
+    (LDAPConnectionPool. server-set bind-request
+                         initial-connections max-connections pcp)))
 
 
 (defn- set-entry-kv!
@@ -472,25 +475,30 @@
 
 (defn connect
   "Connects to an ldap server and returns a thread-safe LDAPConnectionPool.
-   Options is a map with the following entries:
-   :host            Either a string in the form \"address:port\"
-                    OR a map containing the keys,
-                       :address   defaults to localhost
-                       :port      defaults to 389 (or 636 for ldaps),
-                    OR a collection containing multiple hosts used for load
-                    balancing and failover. This entry is optional.
-   :bind-dn         The DN to bind as, optional
-   :password        The password to bind with, optional
-   :num-connections The number of connections in the pool, defaults to 1
-   :ssl?            Boolean, connect over SSL (ldaps), defaults to false
-   :startTLS?       Boolean, use startTLS over non-SSL port, defaults to false
-   :trust-store     Only trust SSL certificates that are in this
-                    JKS format file, optional, defaults to trusting all
-                    certificates
-   :connect-timeout The timeout for making connections (milliseconds),
-                    defaults to 1 minute
-   :timeout         The timeout when waiting for a response from the server
-                    (milliseconds), defaults to 5 minutes
+   Options is a map  with the following entries:
+   :host                Either a string in the form \"address:port\"
+                        OR a map containing the keys,
+                           :address   defaults to localhost
+                           :port      defaults to 389 (or 636 for ldaps),
+                        OR a collection containing multiple hosts used for load
+                        balancing and failover. This entry is optional.
+   :bind-dn             The DN to bind as, optional
+   :password            The password to bind with, optional
+   :num-connections     Establish a fixed size connection pool. Defaults to 1.
+   :initial-connections Establish a connection pool initially of this size with
+                        capability to grow to :max-connections. Defaults to 1.
+   :max-connections     Define maximum size of connection pool. It must be 
+                        greater than or equal to the initial number of 
+                        connections, defaults to value of :initial-connections.
+   :ssl?                Boolean, connect over SSL (ldaps), defaults to false
+   :startTLS?           Boolean, use startTLS over non-SSL port, defaults to false
+   :trust-store         Only trust SSL certificates that are in this
+                        JKS format file, optional, defaults to trusting all
+                        certificates
+   :connect-timeout     The timeout for making connections (milliseconds),
+                        defaults to 1 minute
+   :timeout             The timeout when waiting for a response from the server
+                        (milliseconds), defaults to 5 minutes
    "
   [options]
   (let [host (options :host)]
