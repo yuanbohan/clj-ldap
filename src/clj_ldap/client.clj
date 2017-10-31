@@ -218,14 +218,16 @@
   [{:keys [num-connections initial-connections max-connections startTLS?]
     :as options
     :or {num-connections 1 startTLS? false}}]
-  (let [server-set (create-server-set options)
-        bind-request (bind-request options)
-        pcp (when startTLS?
-              (StartTLSPostConnectProcessor. (create-ssl-context options)))
+  (let [connection (create-connection options)
+        bind-result (.bind connection (bind-request options))
+        pcp (if startTLS?
+              (StartTLSPostConnectProcessor. (create-ssl-context options))
+              nil)
         initial-connections (or initial-connections num-connections)
         max-connections (or max-connections initial-connections)]
-    (LDAPConnectionPool. server-set bind-request
-                         initial-connections max-connections pcp)))
+    (if (= ResultCode/SUCCESS (.getResultCode bind-result))
+      (LDAPConnectionPool. connection initial-connections max-connections pcp)
+      (throw (LDAPException. bind-result)))))
 
 (defn- connect-to-hosts
   "Connects to multiple hosts"
