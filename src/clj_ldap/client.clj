@@ -486,7 +486,7 @@
    :initial-connections Establish a connection pool initially of this size with
                         capability to grow to :max-connections. Defaults to 1.
    :max-connections     Define maximum size of connection pool. It must be 
-	                greater than or equal to the initial number of 
+                        greater than or equal to the initial number of 
                         connections, defaults to value of :initial-connections.
    :ssl?                Boolean, connect over SSL (ldaps), defaults to false
    :startTLS?           Boolean, use startTLS over non-SSL port, defaults to false
