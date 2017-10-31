@@ -61,8 +61,7 @@ Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javado
 Some examples:
 ```clojure
     (ldap/connect {:host "ldap.example.com"
-                   :initial-connections 10
-                   :max-connections 20
+                   :num-connections 4
                    :bind-dn "cn=admin,dc=example,dc=com"
                    :password "password"})
     
