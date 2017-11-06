@@ -485,7 +485,7 @@
     :fine    Level/FINE
     :finer   Level/FINER
     :finest  Level/FINEST
-    Level/ALL))
+    Level/INFO))
 
 (defn open-debug
   "based on com.unboundid.util.Debug javadoc example"
@@ -529,7 +529,8 @@
    :timeout             The timeout when waiting for a response from the server
                         (milliseconds), defaults to 5 minutes
    :debug               a map containing the keys,
-                           :level     defaults to :info
+                           :level     one of [:severe :warning :info :config
+                                      :fine :finer :finest], defaults to :info
                            :filepath  where to store the log information
    "
   [{:keys [host debug] :as options}]
