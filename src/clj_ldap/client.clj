@@ -3,6 +3,9 @@
   (:refer-clojure :exclude [get])
   (:require [clojure.string :as string]
             [clojure.pprint :refer (pprint)])
+  (:import [java.util.logging
+            Level
+            FileHandler])
   (:import [com.unboundid.ldap.sdk
             LDAPResult
             LDAPConnectionOptions
@@ -45,7 +48,8 @@
             SortKey
             SubtreeDeleteRequestControl])
   (:import [com.unboundid.util
-            Base64])
+            Base64
+            Debug])
   (:import [com.unboundid.util.ssl
             SSLUtil
             TrustAllTrustManager
@@ -471,6 +475,31 @@
                                      (into server-sort-control)
                                      (into proxied-auth-control))})))
 
+(defn- get-level
+  [level]
+  (case level
+    :severe  Level/SEVERE
+    :warning Level/WARNING
+    :info    Level/INFO
+    :config  Level/CONFIG
+    :fine    Level/FINE
+    :finer   Level/FINER
+    :finest  Level/FINEST
+    Level/INFO))
+
+(defn open-debug
+  "based on com.unboundid.util.Debug javadoc example"
+  [filepath level]
+  (let [_ (Debug/setEnabled true)
+        logger (Debug/getLogger)
+        handler (FileHandler. filepath)]
+    (.setLevel handler (get-level level))
+    (.addHandler logger handler)))
+
+(defn close-debug
+  []
+  (Debug/setEnabled false))
+
 ;;=========== API ==============================================================
 
 (defn connect
@@ -499,13 +528,20 @@
                         defaults to 1 minute
    :timeout             The timeout when waiting for a response from the server
                         (milliseconds), defaults to 5 minutes
+   :debug               a map containing the keys,
+                           :level     one of [:severe :warning :info :config
+                                      :fine :finer :finest], defaults to :info
+                           :filepath  where to store the log information
    "
-  [options]
-  (let [host (options :host)]
-    (if (and (coll? host)
-             (not (map? host)))
-      (connect-to-hosts options)
-      (connect-to-host options))))
+  [{:keys [host debug] :as options}]
+  (when (map? debug)
+    (let [{:keys [level filepath]
+           :or {level :info}} debug]
+      (open-debug level filepath)))
+  (if (and (coll? host)
+           (not (map? host)))
+    (connect-to-hosts options)
+    (connect-to-host options)))
 
 (defn get-connection
   "Returns a connection from the LDAPConnectionPool object. This approach is
