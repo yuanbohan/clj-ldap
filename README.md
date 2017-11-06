@@ -56,6 +56,11 @@ Options is a map with the following entries:
                          defaults to 1 minute
     :timeout             The timeout when waiting for a response from the server
                          (milliseconds), defaults to 5 minutes
+    :debug               a map containing the keys,
+                           :level     one of [:severe :warning :info :config
+                                      :fine :finer :finest], defaults to :info
+                           :filepath  where to store the log information
+
 
 Throws an [LDAPException](http://www.unboundid.com/products/ldap-sdk/docs/javadoc/com/unboundid/ldap/sdk/LDAPException.html) if an error occurs establishing the connection pool or authenticating to any of the servers.
 Some examples:
@@ -72,7 +77,9 @@ Some examples:
                    :initial-connections 9
                    :max-connections 18
                    :bind-dn "cn=directory manager"
-                   :password "password"})
+                   :password "password"
+                   :debug {:level :info
+                           :filepath "/var/log/ldap.log"})
                         
     (ldap/connect {:host {:port 1389}
                    :bind-dn "cn=admin,dc=example,dc=com"
