@@ -490,11 +490,13 @@
 (defn open-debug
   "based on com.unboundid.util.Debug javadoc example"
   [level filepath]
-  (let [_ (Debug/setEnabled true)
-        logger (Debug/getLogger)
-        handler (FileHandler. filepath)]
-    (.setLevel handler (get-level level))
-    (.addHandler logger handler)))
+  (try
+    (let [_ (Debug/setEnabled true)
+          logger (Debug/getLogger)
+          handler (FileHandler. filepath)]
+      (.setLevel handler (get-level level))
+      (.addHandler logger handler))
+    (catch Exception _ nil)))
 
 (defn close-debug
   []
