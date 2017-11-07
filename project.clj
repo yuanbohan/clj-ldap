@@ -1,6 +1,6 @@
-(defproject org.clojars.pntblnk/clj-ldap "0.0.14"
+(defproject org.clojars.yuanbohan/clj-ldap "0.0.17"
   :description "Clojure ldap client."
-  :url "https://github.com/pauldorman/clj-ldap"
+  :url "https://github.com/yuanbohan/clj-ldap"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [com.unboundid/unboundid-ldapsdk "4.0.0"]]
   :profiles {:test {:dependencies [[lein-clojars "0.9.1"]]}}
